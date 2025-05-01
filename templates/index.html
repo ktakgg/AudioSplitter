@@ -83,14 +83,14 @@
                     <form id="split-form">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="segment-size" class="form-label">Segment Size</label>
-                                <input type="number" class="form-control" id="segment-size" min="1" value="60" required>
+                                <label for="segment-size" class="form-label">Segment Size <span id="size-unit">(seconds)</span></label>
+                                <input type="number" class="form-control" id="segment-size" min="1" value="10" required>
                             </div>
                             <div class="col-md-6">
                                 <label for="split-type" class="form-label">Split By</label>
                                 <select class="form-select" id="split-type">
                                     <option value="seconds" selected>Seconds</option>
-                                    <option value="bytes">Bytes (KB)</option>
+                                    <option value="megabytes">Megabytes (MB)</option>
                                 </select>
                             </div>
                         </div>

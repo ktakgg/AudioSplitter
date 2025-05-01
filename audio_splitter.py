@@ -41,9 +41,14 @@ def split_audio_file(input_file, output_dir, segment_size, split_type='seconds')
         # Calculate segment size in milliseconds
         if split_type == 'seconds':
             segment_ms = segment_size * 1000
-        else:
-            # If split by bytes, estimate milliseconds per segment
+        elif split_type == 'megabytes':
+            # If split by megabytes, estimate milliseconds per segment
             # This is a rough approximation based on file size and duration
+            file_size = os.path.getsize(input_file)
+            ms_per_mb = total_duration / (file_size / (1024 * 1024))
+            segment_ms = segment_size * ms_per_mb
+        else:
+            # Fallback (bytes)
             file_size = os.path.getsize(input_file)
             ms_per_byte = total_duration / file_size
             segment_ms = segment_size * ms_per_byte

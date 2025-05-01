@@ -38,6 +38,18 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadArea.classList.remove('active');
     });
     
+    // Add event listener for split type change
+    const splitType = document.getElementById('split-type');
+    const sizeUnit = document.getElementById('size-unit');
+    
+    splitType.addEventListener('change', (e) => {
+        if (e.target.value === 'seconds') {
+            sizeUnit.textContent = '(seconds)';
+        } else if (e.target.value === 'megabytes') {
+            sizeUnit.textContent = '(MB)';
+        }
+    });
+    
     uploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
         uploadArea.classList.remove('active');
