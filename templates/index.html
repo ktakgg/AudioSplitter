@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+
+{% block additional_head %}
+<style>
+    .drag-drop-area {
+        border: 2px dashed var(--bs-border-color);
+        border-radius: 8px;
+        padding: 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .drag-drop-area.active {
+        border-color: var(--bs-info);
+        background-color: rgba(13, 202, 240, 0.1);
+    }
+    .file-info {
+        background-color: var(--bs-dark);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    #progress-container {
+        height: 5px;
+        width: 100%;
+        background-color: var(--bs-dark);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    #progress-bar {
+        height: 100%;
+        width: 0%;
+        background-color: var(--bs-info);
+        transition: width 0.3s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-cut me-2"></i>Audio File Splitter</h4>
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    Upload an audio file and split it into smaller segments by specifying the duration.
+                </p>
+                
+                <!-- Step 1: Upload File -->
+                <div id="upload-section">
+                    <h5 class="mb-3"><span class="badge bg-info me-2">1</span>Upload Audio File</h5>
+                    <div id="upload-area" class="drag-drop-area mb-3">
+                        <i class="fas fa-cloud-upload-alt fa-3x mb-3 text-info"></i>
+                        <h5>Drag & Drop Audio File Here</h5>
+                        <p class="text-muted">or</p>
+                        <button id="browse-button" class="btn btn-outline-info">Browse Files</button>
+                        <input type="file" id="file-input" accept=".mp3,.wav,.ogg,.m4a,.flac" class="d-none">
+                        <p class="text-muted mt-2">
+                            <small>Supported formats: MP3, WAV, OGG, M4A, FLAC (Max 50MB)</small>
+                        </p>
+                    </div>
+                    <div id="progress-container" class="mb-3 d-none">
+                        <div id="progress-bar"></div>
+                    </div>
+                    <div id="file-info" class="file-info mb-3 d-none">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-file-audio fa-2x text-info me-3"></i>
+                            <div>
+                                <h6 id="file-name" class="mb-1"></h6>
+                                <small id="file-size" class="text-muted"></small>
+                            </div>
+                            <button id="remove-file" class="btn btn-sm btn-outline-danger ms-auto">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 2: Configure Split Options -->
+                <div id="split-options" class="mt-4 d-none">
+                    <h5 class="mb-3"><span class="badge bg-info me-2">2</span>Configure Split Options</h5>
+                    <form id="split-form">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="segment-size" class="form-label">Segment Size</label>
+                                <input type="number" class="form-control" id="segment-size" min="1" value="60" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="split-type" class="form-label">Split By</label>
+                                <select class="form-select" id="split-type">
+                                    <option value="seconds" selected>Seconds</option>
+                                    <option value="bytes">Bytes (KB)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="d-grid mt-3">
+                            <button type="submit" id="split-button" class="btn btn-info">
+                                <i class="fas fa-cut me-2"></i>Split Audio
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Step 3: Results -->
+                <div id="results-section" class="mt-4 d-none">
+                    <h5 class="mb-3"><span class="badge bg-info me-2">3</span>Download Split Segments</h5>
+                    <div class="d-grid gap-2 mb-3">
+                        <button id="download-all" class="btn btn-outline-info">
+                            <i class="fas fa-download me-2"></i>Download All Segments as ZIP
+                        </button>
+                    </div>
+                    <div class="list-group" id="segments-list">
+                        <!-- Segments will be listed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Alert -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050">
+    <div id="error-toast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                <span id="error-message"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,40 @@
+/* Additional custom styles beyond Bootstrap */
+
+/* Smooth transitions */
+.fade-transition {
+    transition: all 0.3s ease;
+}
+
+/* Custom audio player styles if needed */
+.audio-player {
+    width: 100%;
+    margin-top: 10px;
+    border-radius: 4px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .drag-drop-area {
+        padding: 1rem;
+    }
+    
+    .drag-drop-area i {
+        font-size: 2rem;
+    }
+}
+
+/* Success feedback animation */
+@keyframes successPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.success-animation {
+    animation: successPulse 0.5s ease-in-out;
+}
+
+/* Focus styles */
+.form-control:focus, .form-select:focus, .btn:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25);
+}
