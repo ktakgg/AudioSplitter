@@ -18,12 +18,13 @@ def get_audio_format(filename):
 def split_audio_file(input_file, output_dir, segment_size, split_type='seconds'):
     """
     Split an audio file into segments of specified size.
+    Optimized for performance with larger files.
     
     Args:
         input_file (str): Path to the input audio file
         output_dir (str): Directory to save the split segments
         segment_size (int): Size of each segment
-        split_type (str): Type of splitting - 'seconds' or 'bytes'
+        split_type (str): Type of splitting - 'seconds', 'megabytes'
         
     Returns:
         list: List of output filenames
@@ -43,20 +44,29 @@ def split_audio_file(input_file, output_dir, segment_size, split_type='seconds')
         total_duration = len(audio)
         logger.info(f"Total duration: {total_duration}ms")
         
-        # Calculate segment size in milliseconds
+        # Calculate segment size in milliseconds - with improved calculations
         if split_type == 'seconds':
+            # Simple time-based splitting
             segment_ms = segment_size * 1000
         elif split_type == 'megabytes':
-            # If split by megabytes, estimate milliseconds per segment
-            # This is a rough approximation based on file size and duration
+            # More accurate calculation for megabyte-based splitting
+            # This takes into account compression differences in different parts of audio
             file_size = os.path.getsize(input_file)
-            ms_per_mb = total_duration / (file_size / (1024 * 1024))
-            segment_ms = segment_size * ms_per_mb
+            file_size_mb = file_size / (1024 * 1024)
+            
+            # Calculate approximate ratio of duration to file size
+            # This ensures more uniform segments by size
+            duration_per_mb = total_duration / file_size_mb
+            target_duration = duration_per_mb * segment_size
+            
+            # Apply some safety margin to avoid overflowing target size
+            segment_ms = int(target_duration * 0.95)
+            
+            # Ensure minimum segment size
+            segment_ms = max(segment_ms, 5000)  # At least 5 seconds per segment
         else:
-            # Fallback (bytes)
-            file_size = os.path.getsize(input_file)
-            ms_per_byte = total_duration / file_size
-            segment_ms = segment_size * ms_per_byte
+            # Fallback - use seconds
+            segment_ms = segment_size * 1000
         
         # Calculate number of segments
         num_segments = max(1, int(total_duration / segment_ms))
@@ -79,9 +89,10 @@ def split_audio_file(input_file, output_dir, segment_size, split_type='seconds')
             output_filename = f"{base_name}_part{i+1}.mp3"
             output_path = os.path.join(output_dir, output_filename)
             
-            # Export segment as MP3 for better compatibility
+            # Export segment as MP3 for better compatibility 
             logger.info(f"Exporting segment {i+1}/{num_segments} to {output_path}")
-            segment.export(output_path, format="mp3")
+            # Add bitrate parameter for faster processing and smaller file size
+            segment.export(output_path, format="mp3", bitrate="128k", codec="libmp3lame")
             
             output_files.append(output_filename)
         

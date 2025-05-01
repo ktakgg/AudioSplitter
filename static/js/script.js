@@ -190,9 +190,28 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Show progress
+        // Show progress with message
         progressContainer.classList.remove('d-none');
         progressBar.style.width = '0%';
+        
+        // Show processing notification
+        const processingMsg = document.createElement('div');
+        processingMsg.className = 'alert alert-info mt-2';
+        processingMsg.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Processing your audio file. This may take several minutes for large files...';
+        progressContainer.after(processingMsg);
+        
+        // Simulate progress for better UX during long operations
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            if (progress < 95) { // Max to 95% - real completion will set it to 100%
+                progress += (progress < 50) ? 0.5 : 0.1; // Slow down as it gets higher
+                progressBar.style.width = progress + '%';
+            }
+        }, 300);
+        
+        // Increase timeout for large files
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
         
         // Send split request
         const formData = new FormData();
@@ -201,9 +220,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         fetch('/split', {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: controller.signal
         })
         .then(response => {
+            clearTimeout(timeoutId);
+            clearInterval(progressInterval);
             progressBar.style.width = '100%';
             
             return response.json();
@@ -216,10 +238,17 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            showError(error.message || "Error splitting file");
+            // Handle timeout errors specifically
+            if (error.name === 'AbortError') {
+                showError("Operation timed out. The file may be too large to process.");
+            } else {
+                showError(error.message || "Error splitting file");
+            }
         })
         .finally(() => {
+            clearInterval(progressInterval);
             progressContainer.classList.add('d-none');
+            processingMsg.remove();
         });
     }
     

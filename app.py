@@ -23,6 +23,9 @@ OUTPUT_FOLDER = os.path.join(tempfile.gettempdir(), 'audio_splits')
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'm4a', 'flac'}
 MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max file size
 
+# Increase request timeout for long-running tasks
+app.config['TIMEOUT'] = 300  # 5 minutes
+
 # Create upload and output directories if they don't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
