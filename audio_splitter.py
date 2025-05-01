@@ -7,8 +7,13 @@ logger = logging.getLogger(__name__)
 def get_audio_format(filename):
     """
     Returns the format of the audio file based on its extension.
+    Ensures compatibility with common audio formats.
     """
-    return os.path.splitext(filename)[1][1:].lower()
+    ext = os.path.splitext(filename)[1][1:].lower()
+    # Map m4a to mp4 for ffmpeg compatibility
+    if ext == 'm4a':
+        return 'mp4'
+    return ext
 
 def split_audio_file(input_file, output_dir, segment_size, split_type='seconds'):
     """
@@ -70,13 +75,13 @@ def split_audio_file(input_file, output_dir, segment_size, split_type='seconds')
             # Extract segment
             segment = audio[start_ms:end_ms]
             
-            # Generate output filename
-            output_filename = f"{base_name}_part{i+1}.{file_format}"
+            # Generate output filename - always use mp3 for consistency
+            output_filename = f"{base_name}_part{i+1}.mp3"
             output_path = os.path.join(output_dir, output_filename)
             
-            # Export segment
+            # Export segment as MP3 for better compatibility
             logger.info(f"Exporting segment {i+1}/{num_segments} to {output_path}")
-            segment.export(output_path, format=file_format)
+            segment.export(output_path, format="mp3")
             
             output_files.append(output_filename)
         
