@@ -1,7 +1,11 @@
 import os
 import logging
 import uuid
+import time
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_from_directory, url_for, flash, redirect, session
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import DeclarativeBase
 from werkzeug.utils import secure_filename
 from werkzeug.middleware.proxy_fix import ProxyFix
 import tempfile
@@ -12,10 +16,32 @@ from audio_splitter import split_audio_file
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Database base class
+class Base(DeclarativeBase):
+    pass
+
+# Create SQLAlchemy instance
+db = SQLAlchemy(model_class=Base)
+
 # Create app
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev_secret_key")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# Database configuration
+database_url = os.environ.get("DATABASE_URL")
+if not database_url:
+    raise RuntimeError("DATABASE_URL environment variable is not set")
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_recycle": 300,
+    "pool_pre_ping": True,
+}
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Initialize the app with the database extension
+db.init_app(app)
 
 # Configuration
 UPLOAD_FOLDER = os.path.join(tempfile.gettempdir(), 'audio_uploads')
@@ -31,6 +57,12 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+# Create database tables
+with app.app_context():
+    # Import models after app is created
+    import models
+    db.create_all()
+
 # Helper function to check allowed file extensions
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -38,6 +70,10 @@ def allowed_file(filename):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/admin')
+def admin_dashboard():
+    return render_template('admin.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -70,15 +106,36 @@ def upload_file():
         filepath = os.path.join(session_upload_dir, filename)
         file.save(filepath)
         
-        # Store filename in session
+        # Get file information
+        file_size = os.path.getsize(filepath)
+        file_format = filename.rsplit('.', 1)[1].lower() if '.' in filename else 'unknown'
+        
+        # Create database record
+        from models import FileUpload
+        upload_record = FileUpload(
+            session_id=session_id,
+            original_filename=filename,
+            file_size=file_size,
+            file_format=file_format,
+            status='uploaded'
+        )
+        db.session.add(upload_record)
+        db.session.commit()
+        
+        # Store information in session
+        session['upload_id'] = upload_record.id
         session['original_filename'] = filename
         session['filepath'] = filepath
         session['output_dir'] = session_output_dir
         
+        logger.info(f"File uploaded successfully: {filename} ({file_size} bytes)")
+        
         return jsonify({
             'success': True,
             'filename': filename,
-            'session_id': session_id
+            'session_id': session_id,
+            'file_size': file_size,
+            'upload_id': upload_record.id
         })
     
     except Exception as e:
@@ -87,7 +144,7 @@ def upload_file():
 
 @app.route('/split', methods=['POST'])
 def split_file():
-    if 'filepath' not in session or 'output_dir' not in session:
+    if 'filepath' not in session or 'output_dir' not in session or 'upload_id' not in session:
         return jsonify({'error': 'No file uploaded'}), 400
     
     try:
@@ -105,12 +162,29 @@ def split_file():
         if split_type == 'seconds' and segment_size > 3600:
             return jsonify({'error': 'Segment size too large. Maximum 1 hour per segment.'}), 400
         
+        # Get upload record and update status
+        from models import FileUpload, AudioSegment
+        upload_id = session['upload_id']
+        upload_record = FileUpload.query.get(upload_id)
+        if not upload_record:
+            return jsonify({'error': 'Upload record not found'}), 400
+        
+        # Update processing parameters
+        upload_record.segment_size = segment_size
+        upload_record.split_type = split_type
+        upload_record.status = 'processing'
+        upload_record.processing_timestamp = datetime.utcnow()
+        db.session.commit()
+        
         # Process the audio file
         filepath = session['filepath']
         output_dir = session['output_dir']
         original_filename = session['original_filename']
         
         logger.info(f"Starting split process: {original_filename}, {segment_size} {split_type}")
+        
+        # Track processing time
+        start_time = time.time()
         
         # Split the audio file with enhanced error handling
         output_files = split_audio_file(
@@ -120,22 +194,47 @@ def split_file():
             split_type
         )
         
+        processing_duration = time.time() - start_time
+        
         if not output_files:
+            upload_record.status = 'error'
+            upload_record.error_message = 'No segments were created. File may be too short.'
+            db.session.commit()
             return jsonify({'error': 'No segments were created. File may be too short.'}), 400
+        
+        # Calculate total output size and create segment records
+        total_size = 0
+        for i, filename in enumerate(output_files):
+            file_path = os.path.join(output_dir, filename)
+            if os.path.exists(file_path):
+                file_size = os.path.getsize(file_path)
+                total_size += file_size
+                
+                # Create segment record in database
+                segment_record = AudioSegment(
+                    upload_id=upload_id,
+                    filename=filename,
+                    segment_number=i + 1,
+                    file_size=file_size,
+                    duration_ms=0,  # Will be calculated later if needed
+                    start_time_ms=0,  # Will be calculated later if needed
+                    end_time_ms=0   # Will be calculated later if needed
+                )
+                db.session.add(segment_record)
+        
+        # Update upload record with completion details
+        upload_record.segments_created = len(output_files)
+        upload_record.total_output_size = total_size
+        upload_record.processing_duration = processing_duration
+        upload_record.status = 'completed'
+        db.session.commit()
         
         # Store output files in session
         session['output_files'] = output_files
         
-        # Calculate total output size for user information
-        total_size = 0
-        for filename in output_files:
-            file_path = os.path.join(output_dir, filename)
-            if os.path.exists(file_path):
-                total_size += os.path.getsize(file_path)
-        
         total_size_mb = total_size / (1024 * 1024)
         
-        logger.info(f"Successfully created {len(output_files)} segments, total size: {total_size_mb:.1f}MB")
+        logger.info(f"Successfully created {len(output_files)} segments, total size: {total_size_mb:.1f}MB, processing time: {processing_duration:.2f}s")
         
         # Return success response with detailed information
         return jsonify({
@@ -143,10 +242,23 @@ def split_file():
             'message': f'Successfully split into {len(output_files)} segments',
             'files': output_files,
             'total_size_mb': round(total_size_mb, 2),
-            'segment_count': len(output_files)
+            'segment_count': len(output_files),
+            'processing_time': round(processing_duration, 2)
         })
     
     except Exception as e:
+        # Update upload record with error
+        try:
+            upload_id = session.get('upload_id')
+            if upload_id:
+                upload_record = FileUpload.query.get(upload_id)
+                if upload_record:
+                    upload_record.status = 'error'
+                    upload_record.error_message = str(e)
+                    db.session.commit()
+        except:
+            pass
+        
         logger.error(f"Error during file splitting: {str(e)}")
         error_msg = str(e)
         if "timeout" in error_msg.lower() or "worker timeout" in error_msg.lower():
@@ -159,6 +271,18 @@ def download_file(filename):
         return "No files available for download", 400
     
     try:
+        # Track download in database
+        upload_id = session.get('upload_id')
+        if upload_id:
+            from models import AudioSegment
+            segment = AudioSegment.query.filter_by(
+                upload_id=upload_id, 
+                filename=filename
+            ).first()
+            if segment:
+                segment.download_count += 1
+                db.session.commit()
+        
         return send_from_directory(
             session['output_dir'],
             filename,
@@ -215,6 +339,94 @@ def cleanup():
             return jsonify({'error': f'Error cleaning up: {str(e)}'}), 500
     
     return jsonify({'success': True})
+
+# Analytics API endpoints
+@app.route('/api/stats', methods=['GET'])
+def get_stats():
+    """Get application usage statistics"""
+    try:
+        from models import FileUpload, AudioSegment
+        from sqlalchemy import func
+        
+        # Basic statistics
+        total_uploads = FileUpload.query.count()
+        total_segments = AudioSegment.query.count()
+        total_downloads = db.session.query(func.sum(AudioSegment.download_count)).scalar() or 0
+        
+        # File format distribution
+        format_stats = db.session.query(
+            FileUpload.file_format,
+            func.count(FileUpload.id).label('count')
+        ).group_by(FileUpload.file_format).all()
+        
+        # Processing status distribution
+        status_stats = db.session.query(
+            FileUpload.status,
+            func.count(FileUpload.id).label('count')
+        ).group_by(FileUpload.status).all()
+        
+        # Average processing time
+        avg_processing_time = db.session.query(
+            func.avg(FileUpload.processing_duration)
+        ).filter(FileUpload.processing_duration.isnot(None)).scalar() or 0
+        
+        # Total data processed (in MB)
+        total_data_processed = db.session.query(
+            func.sum(FileUpload.file_size)
+        ).scalar() or 0
+        total_data_processed_mb = total_data_processed / (1024 * 1024)
+        
+        return jsonify({
+            'total_uploads': total_uploads,
+            'total_segments': total_segments,
+            'total_downloads': total_downloads,
+            'total_data_processed_mb': round(total_data_processed_mb, 2),
+            'avg_processing_time': round(avg_processing_time, 2) if avg_processing_time else 0,
+            'format_distribution': [{'format': f, 'count': c} for f, c in format_stats],
+            'status_distribution': [{'status': s, 'count': c} for s, c in status_stats]
+        })
+    
+    except Exception as e:
+        logger.error(f"Error getting stats: {str(e)}")
+        return jsonify({'error': 'Failed to retrieve statistics'}), 500
+
+@app.route('/api/recent-uploads', methods=['GET'])
+def get_recent_uploads():
+    """Get recent upload history"""
+    try:
+        from models import FileUpload
+        
+        limit = request.args.get('limit', 10, type=int)
+        
+        recent_uploads = FileUpload.query.order_by(
+            FileUpload.upload_timestamp.desc()
+        ).limit(limit).all()
+        
+        return jsonify({
+            'uploads': [upload.to_dict() for upload in recent_uploads]
+        })
+    
+    except Exception as e:
+        logger.error(f"Error getting recent uploads: {str(e)}")
+        return jsonify({'error': 'Failed to retrieve recent uploads'}), 500
+
+@app.route('/api/upload/<int:upload_id>', methods=['GET'])
+def get_upload_details(upload_id):
+    """Get detailed information about a specific upload"""
+    try:
+        from models import FileUpload, AudioSegment
+        
+        upload = FileUpload.query.get_or_404(upload_id)
+        segments = AudioSegment.query.filter_by(upload_id=upload_id).all()
+        
+        return jsonify({
+            'upload': upload.to_dict(),
+            'segments': [segment.to_dict() for segment in segments]
+        })
+    
+    except Exception as e:
+        logger.error(f"Error getting upload details: {str(e)}")
+        return jsonify({'error': 'Failed to retrieve upload details'}), 500
 
 # Error handlers
 @app.errorhandler(413)

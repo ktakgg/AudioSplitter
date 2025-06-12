@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Audio Splitter{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-chart-line me-2"></i>
+                Admin Dashboard
+            </h1>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4" id="stats-cards">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="fas fa-upload fa-2x text-primary mb-2"></i>
+                    <h5 class="card-title">Total Uploads</h5>
+                    <h3 class="text-primary" id="total-uploads">-</h3>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="fas fa-cut fa-2x text-success mb-2"></i>
+                    <h5 class="card-title">Total Segments</h5>
+                    <h3 class="text-success" id="total-segments">-</h3>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="fas fa-download fa-2x text-info mb-2"></i>
+                    <h5 class="card-title">Total Downloads</h5>
+                    <h3 class="text-info" id="total-downloads">-</h3>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="fas fa-database fa-2x text-warning mb-2"></i>
+                    <h5 class="card-title">Data Processed</h5>
+                    <h3 class="text-warning" id="data-processed">- MB</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">File Format Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="formatChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Processing Status</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="statusChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Performance Metrics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-4">
+                            <div class="border-end">
+                                <h4 class="text-primary" id="avg-processing-time">-</h4>
+                                <p class="text-muted mb-0">Average Processing Time (seconds)</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border-end">
+                                <h4 class="text-success" id="success-rate">-</h4>
+                                <p class="text-muted mb-0">Success Rate (%)</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <h4 class="text-info" id="avg-segments">-</h4>
+                            <p class="text-muted mb-0">Average Segments per File</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Uploads Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Recent Uploads</h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Filename</th>
+                                    <th>Size</th>
+                                    <th>Format</th>
+                                    <th>Segments</th>
+                                    <th>Status</th>
+                                    <th>Upload Time</th>
+                                    <th>Processing Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-uploads-table">
+                                <tr>
+                                    <td colspan="8" class="text-center">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        Loading data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let formatChart, statusChart;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+});
+
+async function loadDashboardData() {
+    try {
+        // Load statistics
+        const statsResponse = await fetch('/api/stats');
+        const stats = await statsResponse.json();
+        
+        if (stats.error) {
+            throw new Error(stats.error);
+        }
+        
+        updateStatsCards(stats);
+        updateCharts(stats);
+        
+        // Load recent uploads
+        const uploadsResponse = await fetch('/api/recent-uploads?limit=20');
+        const uploads = await uploadsResponse.json();
+        
+        if (uploads.error) {
+            throw new Error(uploads.error);
+        }
+        
+        updateRecentUploadsTable(uploads.uploads);
+        
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        showError('Failed to load dashboard data: ' + error.message);
+    }
+}
+
+function updateStatsCards(stats) {
+    document.getElementById('total-uploads').textContent = stats.total_uploads || 0;
+    document.getElementById('total-segments').textContent = stats.total_segments || 0;
+    document.getElementById('total-downloads').textContent = stats.total_downloads || 0;
+    document.getElementById('data-processed').textContent = (stats.total_data_processed_mb || 0) + ' MB';
+    document.getElementById('avg-processing-time').textContent = (stats.avg_processing_time || 0).toFixed(2);
+    
+    // Calculate success rate and average segments
+    const statusData = stats.status_distribution || [];
+    const totalFiles = statusData.reduce((sum, item) => sum + item.count, 0);
+    const completedFiles = statusData.find(item => item.status === 'completed')?.count || 0;
+    const successRate = totalFiles > 0 ? ((completedFiles / totalFiles) * 100).toFixed(1) : 0;
+    
+    document.getElementById('success-rate').textContent = successRate + '%';
+    
+    const avgSegments = stats.total_uploads > 0 ? (stats.total_segments / stats.total_uploads).toFixed(1) : 0;
+    document.getElementById('avg-segments').textContent = avgSegments;
+}
+
+function updateCharts(stats) {
+    // Format distribution chart
+    const formatCtx = document.getElementById('formatChart').getContext('2d');
+    const formatData = stats.format_distribution || [];
+    
+    if (formatChart) {
+        formatChart.destroy();
+    }
+    
+    formatChart = new Chart(formatCtx, {
+        type: 'doughnut',
+        data: {
+            labels: formatData.map(item => item.format.toUpperCase()),
+            datasets: [{
+                data: formatData.map(item => item.count),
+                backgroundColor: [
+                    '#FF6384',
+                    '#36A2EB',
+                    '#FFCE56',
+                    '#4BC0C0',
+                    '#9966FF',
+                    '#FF9F40'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+    
+    // Status distribution chart
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const statusData = stats.status_distribution || [];
+    
+    if (statusChart) {
+        statusChart.destroy();
+    }
+    
+    statusChart = new Chart(statusCtx, {
+        type: 'bar',
+        data: {
+            labels: statusData.map(item => item.status.charAt(0).toUpperCase() + item.status.slice(1)),
+            datasets: [{
+                label: 'Count',
+                data: statusData.map(item => item.count),
+                backgroundColor: [
+                    '#28a745',
+                    '#ffc107',
+                    '#dc3545',
+                    '#17a2b8'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+function updateRecentUploadsTable(uploads) {
+    const tbody = document.getElementById('recent-uploads-table');
+    
+    if (!uploads || uploads.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No uploads found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = uploads.map(upload => {
+        const uploadTime = new Date(upload.upload_timestamp).toLocaleString();
+        const processingTime = upload.processing_duration ? upload.processing_duration.toFixed(2) + 's' : '-';
+        const fileSize = (upload.file_size / (1024 * 1024)).toFixed(2) + ' MB';
+        
+        let statusBadge = '';
+        switch (upload.status) {
+            case 'completed':
+                statusBadge = '<span class="badge bg-success">Completed</span>';
+                break;
+            case 'processing':
+                statusBadge = '<span class="badge bg-warning">Processing</span>';
+                break;
+            case 'error':
+                statusBadge = '<span class="badge bg-danger">Error</span>';
+                break;
+            default:
+                statusBadge = '<span class="badge bg-secondary">Uploaded</span>';
+        }
+        
+        return `
+            <tr>
+                <td>${upload.id}</td>
+                <td>${upload.original_filename}</td>
+                <td>${fileSize}</td>
+                <td>${upload.file_format.toUpperCase()}</td>
+                <td>${upload.segments_created || '-'}</td>
+                <td>${statusBadge}</td>
+                <td>${uploadTime}</td>
+                <td>${processingTime}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function refreshData() {
+    loadDashboardData();
+}
+
+function showError(message) {
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-danger alert-dismissible fade show';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.querySelector('.container').insertBefore(alert, document.querySelector('.container').firstChild);
+}
+</script>
+{% endblock %}
