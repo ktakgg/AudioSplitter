@@ -232,7 +232,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(data => {
             if (data.success) {
-                displayResults(data.files);
+                displayResults(data);
             } else {
                 throw new Error(data.error || "Error splitting file");
             }
@@ -252,12 +252,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    function displayResults(files) {
+    function displayResults(data) {
         // Clear previous results
         segmentsList.innerHTML = '';
         
+        // Add summary information
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'alert alert-success mb-3';
+        summaryDiv.innerHTML = `
+            <h6><i class="fas fa-check-circle me-2"></i>Split Complete!</h6>
+            <p class="mb-1">Created ${data.segment_count} segments</p>
+            <p class="mb-0">Total output size: ${data.total_size_mb}MB</p>
+        `;
+        segmentsList.appendChild(summaryDiv);
+        
         // Add each file to the list
-        files.forEach((file, index) => {
+        data.files.forEach((file, index) => {
             const listItem = document.createElement('a');
             listItem.href = `/download/${encodeURIComponent(file)}`;
             listItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
@@ -266,7 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
             fileInfo.innerHTML = `
                 <i class="fas fa-music me-2"></i>
                 <span>${file}</span>
-                <span class="badge bg-info rounded-pill ms-2">Part ${index + 1}</span>
+                <span class="badge bg-info rounded-pill ms-2">Segment ${index + 1}</span>
             `;
             
             const downloadBtn = document.createElement('button');

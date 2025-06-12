@@ -20,11 +20,12 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 # Configuration
 UPLOAD_FOLDER = os.path.join(tempfile.gettempdir(), 'audio_uploads')
 OUTPUT_FOLDER = os.path.join(tempfile.gettempdir(), 'audio_splits')
-ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'm4a', 'flac'}
-MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max file size
+ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma'}
+MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB max file size
 
-# Increase request timeout for long-running tasks
-app.config['TIMEOUT'] = 300  # 5 minutes
+# Optimized configuration for better performance
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
 # Create upload and output directories if they don't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -63,6 +64,8 @@ def upload_file():
         os.makedirs(session_output_dir, exist_ok=True)
         
         # Save the file
+        if not file.filename:
+            return jsonify({'error': 'Invalid file name'}), 400
         filename = secure_filename(file.filename)
         filepath = os.path.join(session_upload_dir, filename)
         file.save(filepath)
@@ -92,15 +95,24 @@ def split_file():
         segment_size = request.form.get('segment_size', type=int)
         split_type = request.form.get('split_type', 'seconds')
         
+        # Enhanced validation
         if not segment_size or segment_size <= 0:
             return jsonify({'error': 'Invalid segment size'}), 400
+        
+        if split_type == 'megabytes' and segment_size > 50:
+            return jsonify({'error': 'Segment size too large. Maximum 50MB per segment.'}), 400
+        
+        if split_type == 'seconds' and segment_size > 3600:
+            return jsonify({'error': 'Segment size too large. Maximum 1 hour per segment.'}), 400
         
         # Process the audio file
         filepath = session['filepath']
         output_dir = session['output_dir']
         original_filename = session['original_filename']
         
-        # Split the audio file
+        logger.info(f"Starting split process: {original_filename}, {segment_size} {split_type}")
+        
+        # Split the audio file with enhanced error handling
         output_files = split_audio_file(
             filepath, 
             output_dir, 
@@ -108,19 +120,38 @@ def split_file():
             split_type
         )
         
+        if not output_files:
+            return jsonify({'error': 'No segments were created. File may be too short.'}), 400
+        
         # Store output files in session
         session['output_files'] = output_files
         
-        # Return success response with file details
+        # Calculate total output size for user information
+        total_size = 0
+        for filename in output_files:
+            file_path = os.path.join(output_dir, filename)
+            if os.path.exists(file_path):
+                total_size += os.path.getsize(file_path)
+        
+        total_size_mb = total_size / (1024 * 1024)
+        
+        logger.info(f"Successfully created {len(output_files)} segments, total size: {total_size_mb:.1f}MB")
+        
+        # Return success response with detailed information
         return jsonify({
             'success': True,
-            'message': f'File split into {len(output_files)} segments',
-            'files': output_files
+            'message': f'Successfully split into {len(output_files)} segments',
+            'files': output_files,
+            'total_size_mb': round(total_size_mb, 2),
+            'segment_count': len(output_files)
         })
     
     except Exception as e:
         logger.error(f"Error during file splitting: {str(e)}")
-        return jsonify({'error': f'Error splitting file: {str(e)}'}), 500
+        error_msg = str(e)
+        if "timeout" in error_msg.lower() or "worker timeout" in error_msg.lower():
+            error_msg = "File processing took too long. Try splitting into smaller segments or use a smaller file."
+        return jsonify({'error': f'Processing failed: {error_msg}'}), 500
 
 @app.route('/download/<path:filename>', methods=['GET'])
 def download_file(filename):
