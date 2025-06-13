@@ -47,7 +47,7 @@ db.init_app(app)
 UPLOAD_FOLDER = os.path.join(tempfile.gettempdir(), 'audio_uploads')
 OUTPUT_FOLDER = os.path.join(tempfile.gettempdir(), 'audio_splits')
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma'}
-MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB max file size
+MAX_CONTENT_LENGTH = 200 * 1024 * 1024  # 200MB max file size
 
 # Optimized configuration for better performance
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
