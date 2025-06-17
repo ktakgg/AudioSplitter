@@ -39,75 +39,25 @@
     box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25);
 }
 
-/* Progress bar styling consistency - Force exact matching */
-#upload-progress-container .progress,
-#progress-container .progress {
-    height: 16px !important;
-    min-height: 16px !important;
-    max-height: 16px !important;
-    border-radius: 8px !important;
-    background-color: #e9ecef !important;
-    margin-bottom: 0 !important;
-    font-size: 12px !important;
-    line-height: 16px !important;
-    border: none !important;
-    box-shadow: none !important;
-    position: relative !important;
+/* Clean progress bar styling */
+#upload-progress .progress,
+#split-progress .progress {
+    height: 1rem;
+    background-color: #e9ecef;
 }
 
-#upload-progress-container .progress-bar,
-#progress-container .progress-bar {
-    background-color: #0d6efd !important;
-    border-radius: 8px !important;
-    transition: width 0.3s ease !important;
-    background-image: none !important;
-    height: 16px !important;
-    min-height: 16px !important;
-    max-height: 16px !important;
-    line-height: 16px !important;
-    font-size: 12px !important;
-    border: none !important;
-    box-shadow: none !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    bottom: 0 !important;
+#upload-progress .progress-bar,
+#split-progress .progress-bar {
+    background-color: #0d6efd;
 }
 
-/* Force container dimensions to be identical */
-#upload-progress-container,
-#progress-container {
-    min-height: auto !important;
-    padding: 0 !important;
-    margin-top: 1rem !important;
-    margin-bottom: 1rem !important;
+#upload-progress .text-center,
+#split-progress .text-center {
+    margin-top: 0.5rem;
 }
 
-/* Ensure text styling is consistent */
-#upload-progress-container .text-center,
-#progress-container .text-center {
-    margin-top: 0.5rem !important;
-    margin-bottom: 0 !important;
-    height: auto !important;
-    padding: 0 !important;
-    text-align: center !important;
-    overflow: visible !important;
-}
-
-#upload-progress-container small,
-#progress-container small {
-    color: #6c757d !important;
-    font-size: 0.875rem !important;
-    font-weight: normal !important;
-}
-
-/* Remove any Bootstrap overrides that might cause differences */
-#upload-progress-container .progress-bar-striped,
-#progress-container .progress-bar-striped {
-    background-image: none !important;
-}
-
-#upload-progress-container .progress-bar-animated,
-#progress-container .progress-bar-animated {
-    animation: none !important;
+#upload-progress small,
+#split-progress small {
+    color: #6c757d;
+    font-size: 0.875rem;
 }
