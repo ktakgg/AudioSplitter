@@ -195,12 +195,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     resetUploadState();
                 }
             } else if (xhr.status === 413) {
-                const maxSizeMB = window.MAX_FILE_SIZE_MB || 200;
                 try {
                     const response = JSON.parse(xhr.responseText);
-                    showError(response.error || `File too large. Maximum size is ${maxSizeMB}MB. Please try a smaller file.`);
+                    showError(response.error || `File too large. Maximum size is ${maxFileSizeMB}MB. Please try a smaller file.`);
                 } catch (e) {
-                    showError(`File too large. Maximum size is ${maxSizeMB}MB. Please try a smaller file or split it before uploading.`);
+                    showError(`File too large. Maximum size is ${maxFileSizeMB}MB. Please try a smaller file or split it before uploading.`);
                 }
                 resetUploadState();
             } else {
