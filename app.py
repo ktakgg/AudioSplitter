@@ -264,6 +264,7 @@ def split_file():
     except Exception as e:
         # Update upload record with error
         try:
+            from models import FileUpload
             upload_id = session.get('upload_id')
             if upload_id:
                 upload_record = FileUpload.query.get(upload_id)
