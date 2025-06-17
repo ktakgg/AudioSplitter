@@ -265,11 +265,11 @@ document.addEventListener('DOMContentLoaded', function() {
         progressContainer.classList.remove('d-none');
         progressBar.style.width = '0%';
         
-        // Show processing notification
+        // Show processing notification below the progress container
         const processingMsg = document.createElement('div');
-        processingMsg.className = 'alert alert-info mt-2';
-        processingMsg.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Processing your audio file. This may take several minutes for large files...';
-        progressContainer.after(processingMsg);
+        processingMsg.className = 'alert alert-info mt-3';
+        processingMsg.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> 大きなファイルの場合、処理に数分かかることがあります...';
+        progressContainer.parentNode.insertBefore(processingMsg, progressContainer.nextSibling);
         
         // Simulate progress for better UX during long operations
         let progress = 0;
