@@ -198,17 +198,31 @@ def split_file():
         original_filename = session['original_filename']
         
         logger.info(f"Starting split process: {original_filename}, {segment_size} {split_type}")
+        logger.info(f"File path: {filepath}")
+        logger.info(f"Output directory: {output_dir}")
+        logger.info(f"File exists: {os.path.exists(filepath)}")
+        
+        # Verify file accessibility
+        if not os.path.exists(filepath):
+            raise Exception(f"Input file not found: {filepath}")
         
         # Track processing time
         start_time = time.time()
         
         # Split the audio file with enhanced error handling
-        output_files = split_audio_file(
-            filepath, 
-            output_dir, 
-            segment_size, 
-            split_type
-        )
+        try:
+            output_files = split_audio_file(
+                filepath, 
+                output_dir, 
+                segment_size, 
+                split_type
+            )
+        except Exception as split_error:
+            logger.error(f"Split audio file error: {str(split_error)}")
+            logger.error(f"Error type: {type(split_error).__name__}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            raise
         
         processing_duration = time.time() - start_time
         

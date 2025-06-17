@@ -161,38 +161,51 @@ def split_audio_file(input_file, output_dir, segment_size, split_type='seconds')
                 
                 # Export with fast, reliable settings
                 export_success = False
+                export_error_details = []
                 
                 # Use optimized encoding based on file size
                 if file_size_mb > 50:
                     # Fast encoding for large files
-                    try:
-                        segment.export(output_path, format="mp3", bitrate="96k")
-                        export_success = True
-                    except Exception:
-                        try:
-                            segment.export(output_path.replace('.mp3', '.wav'), format="wav")
-                            output_filename = output_filename.replace('.mp3', '.wav')
-                            export_success = True
-                        except Exception as e:
-                            logger.error(f"Failed to export segment {i+1}: {e}")
-                            continue
+                    export_attempts = [
+                        ("MP3 fast", lambda: segment.export(output_path, format="mp3", bitrate="96k")),
+                        ("WAV fallback", lambda: (
+                            segment.export(output_path.replace('.mp3', '.wav'), format="wav"),
+                            setattr(locals(), 'output_filename', output_filename.replace('.mp3', '.wav'))
+                        )[0])
+                    ]
                 else:
                     # Standard quality for smaller files
+                    export_attempts = [
+                        ("MP3 standard", lambda: segment.export(output_path, format="mp3", bitrate="128k")),
+                        ("MP3 basic", lambda: segment.export(output_path, format="mp3")),
+                        ("WAV fallback", lambda: (
+                            segment.export(output_path.replace('.mp3', '.wav'), format="wav"),
+                            setattr(locals(), 'output_filename', output_filename.replace('.mp3', '.wav'))
+                        )[0])
+                    ]
+                
+                for attempt_name, export_func in export_attempts:
                     try:
-                        segment.export(output_path, format="mp3", bitrate="128k")
+                        logger.info(f"Attempting {attempt_name} export for segment {i+1}")
+                        export_func()
+                        if attempt_name == "WAV fallback":
+                            output_filename = output_filename.replace('.mp3', '.wav')
                         export_success = True
-                    except Exception:
-                        try:
-                            segment.export(output_path, format="mp3")
-                            export_success = True
-                        except Exception:
-                            try:
-                                segment.export(output_path.replace('.mp3', '.wav'), format="wav")
-                                output_filename = output_filename.replace('.mp3', '.wav')
-                                export_success = True
-                            except Exception as e:
-                                logger.error(f"Failed to export segment {i+1}: {e}")
-                                continue
+                        logger.info(f"Successfully exported segment {i+1} using {attempt_name}")
+                        break
+                    except Exception as e:
+                        error_detail = f"{attempt_name}: {str(e)}"
+                        export_error_details.append(error_detail)
+                        logger.warning(f"Export attempt {attempt_name} failed: {e}")
+                        
+                        # Check for specific pattern matching error
+                        if "string did not match the expected pattern" in str(e).lower():
+                            logger.error(f"Pattern matching error in {attempt_name}: {e}")
+                
+                if not export_success:
+                    error_msg = f"All export attempts failed for segment {i+1}: " + "; ".join(export_error_details)
+                    logger.error(error_msg)
+                    continue
                 
                 if export_success:
                     output_files.append(output_filename)
