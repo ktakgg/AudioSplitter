@@ -86,7 +86,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    window.addEventListener('beforeunload', cleanupFiles);
+    // Add event listener for manual cleanup button
+    const manualCleanupBtn = document.getElementById('manual-cleanup-btn');
+    if (manualCleanupBtn) {
+        manualCleanupBtn.addEventListener('click', () => {
+            const confirmed = confirm('セッションをクリーンアップしますか？\n\nこの操作により、アップロードした音声ファイルと分割ファイルがすべて削除されます。');
+            if (confirmed) {
+                cleanupFiles();
+            }
+        });
+    }
+    
+    // Disable automatic cleanup to prevent interference with downloads
+    // window.addEventListener('beforeunload', cleanupFiles);
     
     // Functions
     function handleFileSelection(e) {
@@ -446,6 +458,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     deleteFilesBtn.classList.remove('btn-outline-danger');
                     deleteFilesBtn.classList.add('btn-secondary');
                 }
+                
+                const manualCleanupBtn = document.getElementById('manual-cleanup-btn');
+                if (manualCleanupBtn) {
+                    manualCleanupBtn.disabled = true;
+                    manualCleanupBtn.innerHTML = '<i class="fas fa-check me-2"></i>削除済み';
+                    manualCleanupBtn.classList.remove('btn-outline-secondary');
+                    manualCleanupBtn.classList.add('btn-secondary');
+                }
             } else {
                 showError(data.error || 'ファイル削除中にエラーが発生しました');
             }
@@ -461,9 +481,27 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function cleanupFiles() {
-        // Send cleanup request when user leaves the page
-        if (sessionId) {
-            navigator.sendBeacon('/cleanup', JSON.stringify({ session_id: sessionId }));
+        // Manual cleanup function - only called explicitly
+        if (!sessionId) {
+            showError('セッション情報が見つかりません');
+            return;
         }
+        
+        fetch('/cleanup', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ session_id: sessionId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('ファイルクリーンアップ完了');
+            }
+        })
+        .catch(error => {
+            console.error('クリーンアップエラー:', error);
+        });
     }
 });

@@ -346,36 +346,53 @@ def download_all():
         return "No files available for download", 400
     
     try:
-        # Create a zip file with all segments
+        # Verify session data exists
         session_id = session['session_id']
+        output_dir = session['output_dir']
+        output_files = session.get('output_files', [])
+        
+        # Check if output directory exists
+        if not os.path.exists(output_dir):
+            logger.error(f"Output directory does not exist: {output_dir}")
+            return "Files not found. They may have been cleaned up.", 400
+        
+        # Get list of actual files in the directory
+        actual_files = []
+        if os.path.exists(output_dir):
+            actual_files = [f for f in os.listdir(output_dir) if os.path.isfile(os.path.join(output_dir, f))]
+        
+        if not actual_files:
+            logger.error(f"No files found in output directory: {output_dir}")
+            return "No segment files found to download.", 400
+        
+        # Create zip file with all segments
         zip_filename = f"{session_id}_all_segments.zip"
         zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
-        output_dir = session['output_dir']
         
         # Remove existing zip file if it exists
         if os.path.exists(zip_path):
             os.remove(zip_path)
         
-        # Create zip file with all segments
         import zipfile
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(output_dir):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    arcname = os.path.relpath(file_path, output_dir)
-                    zipf.write(file_path, arcname)
+            for filename in actual_files:
+                file_path = os.path.join(output_dir, filename)
+                if os.path.exists(file_path):
+                    zipf.write(file_path, filename)
+                    logger.info(f"Added to ZIP: {filename}")
         
         # Verify zip file was created and has content
         if not os.path.exists(zip_path) or os.path.getsize(zip_path) == 0:
+            logger.error("ZIP file creation failed or empty")
             return "Error: ZIP file creation failed", 500
             
-        logger.info(f"Created ZIP file: {zip_path} ({os.path.getsize(zip_path)} bytes)")
+        logger.info(f"Created ZIP file: {zip_path} ({os.path.getsize(zip_path)} bytes) with {len(actual_files)} files")
         
         return send_from_directory(
             OUTPUT_FOLDER,
             zip_filename,
             as_attachment=True,
-            download_name=f"audio_segments_{session['original_filename'].split('.')[0]}.zip"
+            download_name=f"audio_segments_{session.get('original_filename', 'audio').split('.')[0]}.zip"
         )
     except Exception as e:
         logger.error(f"Error during zip file download: {str(e)}")
