@@ -78,6 +78,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     downloadAllBtn.addEventListener('click', downloadAllSegments);
     
+    // Add event listener for manual delete button
+    const deleteFilesBtn = document.getElementById('delete-files-btn');
+    if (deleteFilesBtn) {
+        deleteFilesBtn.addEventListener('click', () => {
+            showDeleteConfirmation();
+        });
+    }
+    
     window.addEventListener('beforeunload', cleanupFiles);
     
     // Functions
@@ -348,7 +356,96 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function downloadAllSegments() {
-        window.location.href = '/download-all';
+        // Create a temporary link to trigger download
+        const link = document.createElement('a');
+        link.href = '/download-all';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Show deletion confirmation popup after a short delay
+        setTimeout(() => {
+            showDeleteConfirmation();
+        }, 1000);
+    }
+    
+    function showDeleteConfirmation() {
+        // Check if this is called from download button or manual delete button
+        const isFromDownload = arguments[0] === 'download';
+        
+        let message;
+        if (isFromDownload) {
+            message = 'ダウンロードが完了しました。\n\nサーバー上の分割ファイルを削除しますか？\n（セキュリティのため削除を推奨します）';
+        } else {
+            message = 'サーバー上の分割ファイルを削除しますか？\n\n削除後はファイルをダウンロードできなくなります。\n（セキュリティのため削除を推奨します）';
+        }
+        
+        const confirmed = confirm(message);
+        
+        if (confirmed) {
+            deleteServerFiles();
+        }
+    }
+    
+    function deleteServerFiles() {
+        if (!sessionId) {
+            showError('セッション情報が見つかりません');
+            return;
+        }
+        
+        fetch('/delete-files', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ session_id: sessionId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                const successDiv = document.createElement('div');
+                successDiv.className = 'alert alert-info mb-3';
+                successDiv.innerHTML = `
+                    <h6><i class="fas fa-info-circle me-2"></i>ファイル削除完了</h6>
+                    <p class="mb-0">サーバー上の分割ファイルを削除しました。</p>
+                `;
+                
+                // Insert at the top of results
+                const segmentsList = document.getElementById('segments-list');
+                segmentsList.insertBefore(successDiv, segmentsList.firstChild);
+                
+                // Disable download buttons
+                document.querySelectorAll('.download-btn').forEach(btn => {
+                    btn.disabled = true;
+                    btn.textContent = '削除済み';
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-secondary');
+                });
+                
+                const downloadAllBtn = document.getElementById('download-all');
+                if (downloadAllBtn) {
+                    downloadAllBtn.disabled = true;
+                    downloadAllBtn.innerHTML = '<i class="fas fa-check me-2"></i>削除済み';
+                    downloadAllBtn.classList.remove('btn-outline-primary');
+                    downloadAllBtn.classList.add('btn-secondary');
+                }
+                
+                const deleteFilesBtn = document.getElementById('delete-files-btn');
+                if (deleteFilesBtn) {
+                    deleteFilesBtn.disabled = true;
+                    deleteFilesBtn.innerHTML = '<i class="fas fa-check me-2"></i>削除済み';
+                    deleteFilesBtn.classList.remove('btn-outline-danger');
+                    deleteFilesBtn.classList.add('btn-secondary');
+                }
+            } else {
+                showError(data.error || 'ファイル削除中にエラーが発生しました');
+            }
+        })
+        .catch(error => {
+            showError('ファイル削除中にエラーが発生しました: ' + error.message);
+        });
     }
     
     function showError(message) {

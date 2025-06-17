@@ -388,6 +388,61 @@ def cleanup():
     
     return jsonify({'success': True})
 
+@app.route('/delete-files', methods=['POST'])
+def delete_files():
+    """Delete files for a specific session after download"""
+    try:
+        data = request.get_json()
+        if not data or 'session_id' not in data:
+            return jsonify({'error': 'Session ID is required'}), 400
+        
+        session_id = data['session_id']
+        
+        # Verify session matches current user session
+        if session.get('session_id') != session_id:
+            return jsonify({'error': 'Invalid session'}), 403
+        
+        upload_dir = os.path.join(UPLOAD_FOLDER, session_id)
+        output_dir = os.path.join(OUTPUT_FOLDER, session_id)
+        
+        deleted_files = []
+        
+        # Delete upload directory
+        if os.path.exists(upload_dir):
+            shutil.rmtree(upload_dir)
+            deleted_files.append('upload directory')
+        
+        # Delete output directory
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
+            deleted_files.append('output directory')
+        
+        # Update database record to indicate files were deleted
+        upload_id = session.get('upload_id')
+        if upload_id:
+            from models import FileUpload
+            upload_record = FileUpload.query.get(upload_id)
+            if upload_record:
+                upload_record.status = 'deleted'
+                db.session.commit()
+        
+        # Clear session data
+        session.pop('output_files', None)
+        session.pop('filepath', None)
+        session.pop('output_dir', None)
+        
+        logger.info(f"Files deleted successfully for session: {session_id}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Deleted {len(deleted_files)} directories',
+            'deleted': deleted_files
+        })
+        
+    except Exception as e:
+        logger.error(f"Error during file deletion: {str(e)}")
+        return jsonify({'error': f'Error deleting files: {str(e)}'}), 500
+
 # Analytics API endpoints
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
