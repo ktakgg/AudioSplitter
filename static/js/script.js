@@ -124,8 +124,8 @@ document.addEventListener('DOMContentLoaded', function() {
             fileLimitText.textContent = `開発環境: 最大${maxFileSizeMB}MBまでのファイルをアップロード可能`;
             fileLimitNotice.className = 'alert alert-success py-2 px-3 mt-2';
         } else {
-            fileLimitText.textContent = `デプロイ環境: 最大${deploymentLimit}MBまでのファイルをアップロード可能（開発環境では${maxFileSizeMB}MB）`;
-            fileLimitNotice.className = 'alert alert-warning py-2 px-3 mt-2';
+            fileLimitText.textContent = `デプロイ環境: 大容量ファイル対応（チャンク分割アップロード機能）`;
+            fileLimitNotice.className = 'alert alert-info py-2 px-3 mt-2';
         }
     }
     
@@ -207,6 +207,95 @@ document.addEventListener('DOMContentLoaded', function() {
         segmentsList.innerHTML = '';
     }
     
+    function uploadFileChunked(file) {
+        const chunkSize = 16 * 1024 * 1024; // 16MB chunks for safety
+        const totalChunks = Math.ceil(file.size / chunkSize);
+        let currentChunk = 0;
+        
+        console.log(`Starting chunked upload: ${file.name}, ${totalChunks} chunks`);
+        
+        uploadProgress.classList.remove('d-none');
+        uploadProgressBar.style.width = '0%';
+        
+        function uploadNextChunk() {
+            if (currentChunk >= totalChunks) {
+                uploadProgress.classList.add('d-none');
+                return;
+            }
+            
+            const start = currentChunk * chunkSize;
+            const end = Math.min(start + chunkSize, file.size);
+            const chunk = file.slice(start, end);
+            
+            const formData = new FormData();
+            formData.append('chunk', chunk);
+            formData.append('chunkNumber', currentChunk);
+            formData.append('totalChunks', totalChunks);
+            formData.append('filename', file.name);
+            formData.append('fileSize', file.size);
+            
+            const xhr = new XMLHttpRequest();
+            xhr.timeout = 300000; // 5 minutes timeout
+            xhr.open('POST', '/upload-chunk', true);
+            
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.success) {
+                            currentChunk++;
+                            const progress = (currentChunk / totalChunks) * 100;
+                            uploadProgressBar.style.width = progress + '%';
+                            
+                            if (response.complete) {
+                                uploadProgress.classList.add('d-none');
+                                sessionId = response.session_id;
+                                currentFile = file;
+                                
+                                console.log('Chunked upload complete, session ID:', sessionId);
+                                
+                                // Show split options
+                                setTimeout(() => {
+                                    splitOptions.classList.remove('d-none');
+                                }, 300);
+                            } else {
+                                setTimeout(uploadNextChunk, 100); // Small delay between chunks
+                            }
+                        } else {
+                            showError(response.error || "チャンクアップロードに失敗しました");
+                            uploadProgress.classList.add('d-none');
+                            resetUploadState();
+                        }
+                    } catch (e) {
+                        showError("チャンクアップロードのレスポンス処理エラー");
+                        uploadProgress.classList.add('d-none');
+                        resetUploadState();
+                    }
+                } else {
+                    showError(`チャンクアップロードに失敗しました: ${xhr.status}`);
+                    uploadProgress.classList.add('d-none');
+                    resetUploadState();
+                }
+            };
+            
+            xhr.onerror = function() {
+                showError("チャンクアップロード中にネットワークエラーが発生しました");
+                uploadProgress.classList.add('d-none');
+                resetUploadState();
+            };
+            
+            xhr.ontimeout = function() {
+                showError("チャンクアップロードがタイムアウトしました");
+                uploadProgress.classList.add('d-none');
+                resetUploadState();
+            };
+            
+            xhr.send(formData);
+        }
+        
+        uploadNextChunk();
+    }
+
     function uploadFile(file) {
         // Show upload progress
         uploadProgress.classList.remove('d-none');
