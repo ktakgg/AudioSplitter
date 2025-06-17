@@ -443,6 +443,36 @@ document.addEventListener('DOMContentLoaded', function() {
                     item.classList.remove('list-group-item-action');
                 });
                 
+                // Disable upload section
+                const fileInfoSection = document.getElementById('file-info');
+                const splitOptions = document.getElementById('split-options');
+                const removeFileBtn = document.getElementById('remove-file');
+                const splitButton = document.getElementById('split-button');
+                
+                if (fileInfoSection) {
+                    fileInfoSection.style.opacity = '0.5';
+                    fileInfoSection.style.pointerEvents = 'none';
+                }
+                
+                if (splitOptions) {
+                    splitOptions.style.opacity = '0.5';
+                    splitOptions.style.pointerEvents = 'none';
+                }
+                
+                if (removeFileBtn) {
+                    removeFileBtn.disabled = true;
+                    removeFileBtn.innerHTML = '<i class="fas fa-ban"></i> 削除済み';
+                    removeFileBtn.classList.remove('btn-outline-danger');
+                    removeFileBtn.classList.add('btn-secondary');
+                }
+                
+                if (splitButton) {
+                    splitButton.disabled = true;
+                    splitButton.innerHTML = '<i class="fas fa-ban me-2"></i>ファイル削除済み';
+                    splitButton.classList.remove('btn-success');
+                    splitButton.classList.add('btn-secondary');
+                }
+                
                 const downloadAllBtn = document.getElementById('download-all');
                 if (downloadAllBtn) {
                     downloadAllBtn.disabled = true;
