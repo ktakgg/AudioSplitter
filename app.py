@@ -78,7 +78,11 @@ def get_config():
     """Return client configuration including file size limits"""
     return jsonify({
         'max_file_size': MAX_CONTENT_LENGTH,
-        'max_file_size_mb': MAX_CONTENT_LENGTH // (1024 * 1024)
+        'max_file_size_mb': MAX_CONTENT_LENGTH // (1024 * 1024),
+        'environment': os.environ.get('REPLIT_DEPLOYMENT', 'development'),
+        'flask_config_max': app.config.get('MAX_CONTENT_LENGTH'),
+        'env_flask_max': os.environ.get('FLASK_MAX_CONTENT_LENGTH'),
+        'deployment_id': os.environ.get('REPL_ID', 'local')
     })
 
 @app.route('/admin')
