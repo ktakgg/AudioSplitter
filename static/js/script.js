@@ -12,10 +12,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultsSection = document.getElementById('results-section');
     const segmentsList = document.getElementById('segments-list');
     const downloadAllBtn = document.getElementById('download-all');
-    const uploadProgressContainer = document.getElementById('upload-progress-container');
+    const uploadProgress = document.getElementById('upload-progress');
     const uploadProgressBar = document.getElementById('upload-progress-bar');
-    const progressContainer = document.getElementById('progress-container');
-    const progressBar = document.getElementById('progress-bar');
+    const splitProgress = document.getElementById('split-progress');
+    const splitProgressBar = document.getElementById('split-progress-bar');
     const errorToast = document.getElementById('error-toast');
     const errorMessage = document.getElementById('error-message');
     
@@ -170,8 +170,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function uploadFile(file) {
-        // Show upload progress container
-        uploadProgressContainer.classList.remove('d-none');
+        // Show upload progress
+        uploadProgress.classList.remove('d-none');
         uploadProgressBar.style.width = '0%';
         
         const formData = new FormData();
@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         xhr.onload = function() {
-            uploadProgressContainer.classList.add('d-none');
+            uploadProgress.classList.add('d-none');
             
             if (xhr.status === 200) {
                 try {
@@ -236,13 +236,13 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         xhr.onerror = function() {
-            uploadProgressContainer.classList.add('d-none');
+            uploadProgress.classList.add('d-none');
             showError("Network error occurred while uploading. Please check your connection and try again.");
             resetUploadState();
         };
         
         xhr.ontimeout = function() {
-            uploadProgressContainer.classList.add('d-none');
+            uploadProgress.classList.add('d-none');
             showError("Upload timed out. Please try with a smaller file or check your connection.");
             resetUploadState();
         };
@@ -261,19 +261,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Show progress with message
-        progressContainer.classList.remove('d-none');
-        progressBar.style.width = '0%';
-        
-        // No additional processing message needed - using the built-in Japanese text
-        const processingMsg = null;
+        // Show split progress
+        splitProgress.classList.remove('d-none');
+        splitProgressBar.style.width = '0%';
         
         // Simulate progress for better UX during long operations
         let progress = 0;
         const progressInterval = setInterval(() => {
             if (progress < 95) { // Max to 95% - real completion will set it to 100%
                 progress += (progress < 50) ? 0.5 : 0.1; // Slow down as it gets higher
-                progressBar.style.width = progress + '%';
+                splitProgressBar.style.width = progress + '%';
             }
         }, 300);
         
@@ -294,7 +291,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => {
             clearTimeout(timeoutId);
             clearInterval(progressInterval);
-            progressBar.style.width = '100%';
+            splitProgressBar.style.width = '100%';
             
             return response.json();
         })
@@ -315,10 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .finally(() => {
             clearInterval(progressInterval);
-            progressContainer.classList.add('d-none');
-            if (processingMsg && processingMsg.remove) {
-                processingMsg.remove();
-            }
+            splitProgress.classList.add('d-none');
         });
     }
     
