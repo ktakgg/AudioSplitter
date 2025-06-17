@@ -265,11 +265,8 @@ document.addEventListener('DOMContentLoaded', function() {
         progressContainer.classList.remove('d-none');
         progressBar.style.width = '0%';
         
-        // Show processing notification below the progress container
-        const processingMsg = document.createElement('div');
-        processingMsg.className = 'alert alert-info mt-3';
-        processingMsg.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> 大きなファイルの場合、処理に数分かかることがあります...';
-        progressContainer.parentNode.insertBefore(processingMsg, progressContainer.nextSibling);
+        // No additional processing message needed - using the built-in Japanese text
+        const processingMsg = null;
         
         // Simulate progress for better UX during long operations
         let progress = 0;
@@ -319,7 +316,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .finally(() => {
             clearInterval(progressInterval);
             progressContainer.classList.add('d-none');
-            processingMsg.remove();
+            if (processingMsg && processingMsg.remove) {
+                processingMsg.remove();
+            }
         });
     }
     
