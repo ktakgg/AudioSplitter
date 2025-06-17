@@ -366,7 +366,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Show deletion confirmation popup after a short delay
         setTimeout(() => {
-            showDeleteConfirmation();
+            showDeleteConfirmation('download');
         }, 1000);
     }
     
