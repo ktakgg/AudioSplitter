@@ -173,6 +173,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show upload progress container
         uploadProgressContainer.classList.remove('d-none');
         uploadProgressBar.style.width = '0%';
+        uploadProgressBar.textContent = '0%';
+        uploadProgressBar.setAttribute('aria-valuenow', '0');
         
         const formData = new FormData();
         formData.append('file', file);
@@ -188,6 +190,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.lengthComputable) {
                 const percent = (e.loaded / e.total) * 100;
                 uploadProgressBar.style.width = percent + '%';
+                uploadProgressBar.textContent = Math.round(percent) + '%';
+                uploadProgressBar.setAttribute('aria-valuenow', Math.round(percent));
             }
         };
         
@@ -199,6 +203,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     const response = JSON.parse(xhr.responseText);
                     if (response.success) {
                         uploadProgressBar.style.width = '100%';
+                        uploadProgressBar.textContent = '100%';
+                        uploadProgressBar.setAttribute('aria-valuenow', '100');
                         sessionId = response.session_id;
                         
                         console.log('Upload successful:', response);
@@ -264,6 +270,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show progress
         progressContainer.classList.remove('d-none');
         progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+        progressBar.setAttribute('aria-valuenow', '0');
         
         // Simulate progress for better UX during long operations
         let progress = 0;
@@ -271,6 +279,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (progress < 95) { // Max to 95% - real completion will set it to 100%
                 progress += (progress < 50) ? 0.5 : 0.1; // Slow down as it gets higher
                 progressBar.style.width = progress + '%';
+                progressBar.textContent = Math.round(progress) + '%';
+                progressBar.setAttribute('aria-valuenow', Math.round(progress));
             }
         }, 300);
         
@@ -292,6 +302,8 @@ document.addEventListener('DOMContentLoaded', function() {
             clearTimeout(timeoutId);
             clearInterval(progressInterval);
             progressBar.style.width = '100%';
+            progressBar.textContent = '100%';
+            progressBar.setAttribute('aria-valuenow', '100');
             
             return response.json();
         })
