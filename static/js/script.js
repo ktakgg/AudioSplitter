@@ -90,7 +90,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Check file size (max 200MB)
         const maxSize = 200 * 1024 * 1024; // 209,715,200 bytes
-        console.log(`File size: ${file.size} bytes (${formatFileSize(file.size)}), Max size: ${maxSize} bytes`);
         
         if (file.size > maxSize) {
             showError(`File too large (${formatFileSize(file.size)}). Maximum size is 200MB. Please try a smaller file or split it before uploading.`);
