@@ -46,7 +46,11 @@ OUTPUT_FOLDER = os.path.join(tempfile.gettempdir(), 'audio_splits')
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma'}
 
 # Get max content length from environment or default to 200MB
-MAX_CONTENT_LENGTH = int(os.environ.get('FLASK_MAX_CONTENT_LENGTH', 200 * 1024 * 1024))
+# Use smaller limit for deployment environments due to proxy restrictions
+if os.environ.get('REPLIT_DEPLOYMENT') == '1':
+    MAX_CONTENT_LENGTH = int(os.environ.get('FLASK_MAX_CONTENT_LENGTH', 32 * 1024 * 1024))  # 32MB for deployment
+else:
+    MAX_CONTENT_LENGTH = int(os.environ.get('FLASK_MAX_CONTENT_LENGTH', 200 * 1024 * 1024))  # 200MB for development
 
 # Flask configuration for deployment
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
