@@ -43,9 +43,13 @@
 #upload-progress-container .progress,
 #progress-container .progress {
     height: 1rem !important;
+    min-height: 1rem !important;
+    max-height: 1rem !important;
     border-radius: 0.5rem !important;
     background-color: #e9ecef !important;
     margin-bottom: 0 !important;
+    font-size: 0.75rem !important;
+    line-height: 1rem !important;
 }
 
 #upload-progress-container .progress-bar,
@@ -54,6 +58,20 @@
     border-radius: 0.5rem !important;
     transition: width 0.3s ease !important;
     background-image: none !important;
+    height: 1rem !important;
+    min-height: 1rem !important;
+    max-height: 1rem !important;
+    line-height: 1rem !important;
+    font-size: 0.75rem !important;
+}
+
+/* Force container dimensions to be identical */
+#upload-progress-container,
+#progress-container {
+    min-height: 3rem !important;
+    padding: 0 !important;
+    margin-top: 1rem !important;
+    margin-bottom: 1rem !important;
 }
 
 /* Ensure text styling is consistent */
@@ -62,6 +80,10 @@
 #progress-container #processing-message {
     margin-top: 0.5rem !important;
     margin-bottom: 0 !important;
+    height: 1.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 #upload-progress-container small,
