@@ -1,0 +1,43 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: audio-splitter
+  annotations:
+    # Cloud Run specific annotations for large file uploads
+    run.googleapis.com/ingress: all
+    run.googleapis.com/ingress-status: all
+    autoscaling.knative.dev/maxScale: "10"
+    autoscaling.knative.dev/minScale: "1"
+spec:
+  template:
+    metadata:
+      annotations:
+        # Increase request timeout for large file uploads
+        run.googleapis.com/timeout: "600s"
+        # Configure memory and CPU for large file processing
+        run.googleapis.com/memory: "2Gi"
+        run.googleapis.com/cpu: "2"
+        # Configure concurrency for stability
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      containerConcurrency: 10
+      timeoutSeconds: 600
+      containers:
+      - image: gcr.io/PROJECT_ID/audio-splitter
+        ports:
+        - containerPort: 5000
+        env:
+        - name: FLASK_MAX_CONTENT_LENGTH
+          value: "209715200"
+        - name: GUNICORN_TIMEOUT
+          value: "600"
+        - name: PYTHONPATH
+          value: "."
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+          requests:
+            cpu: 1000m
+            memory: 1Gi

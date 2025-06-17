@@ -23,6 +23,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // State
     let currentFile = null;
     let sessionId = null;
+    let maxFileSize = 200 * 1024 * 1024; // Default 200MB
+    let maxFileSizeMB = 200;
+    
+    // Fetch server configuration on load
+    fetch('/config')
+        .then(response => response.json())
+        .then(config => {
+            maxFileSize = config.max_file_size;
+            maxFileSizeMB = config.max_file_size_mb;
+        })
+        .catch(error => {
+            console.warn('Failed to load server config, using defaults:', error);
+        });
     
     // Event listeners
     browseButton.addEventListener('click', () => fileInput.click());
@@ -88,11 +101,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Check file size (max 200MB)
-        const maxSize = 200 * 1024 * 1024; // 209,715,200 bytes
-        
-        if (file.size > maxSize) {
-            showError(`File too large (${formatFileSize(file.size)}). Maximum size is 200MB. Please try a smaller file or split it before uploading.`);
+        // Check file size using server-configured limit
+        if (file.size > maxFileSize) {
+            showError(`File too large (${formatFileSize(file.size)}). Maximum size is ${maxFileSizeMB}MB. Please try a smaller file or split it before uploading.`);
             return;
         }
         
@@ -184,11 +195,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     resetUploadState();
                 }
             } else if (xhr.status === 413) {
+                const maxSizeMB = window.MAX_FILE_SIZE_MB || 200;
                 try {
                     const response = JSON.parse(xhr.responseText);
-                    showError(response.error || "File too large. Maximum size is 200MB. Please try a smaller file.");
+                    showError(response.error || `File too large. Maximum size is ${maxSizeMB}MB. Please try a smaller file.`);
                 } catch (e) {
-                    showError("File too large. Maximum size is 200MB. Please try a smaller file or split it before uploading.");
+                    showError(`File too large. Maximum size is ${maxSizeMB}MB. Please try a smaller file or split it before uploading.`);
                 }
                 resetUploadState();
             } else {

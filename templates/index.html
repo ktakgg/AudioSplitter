@@ -134,5 +134,10 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    // Pass server configuration to JavaScript
+    window.MAX_FILE_SIZE = {{ config.MAX_CONTENT_LENGTH }};
+    window.MAX_FILE_SIZE_MB = Math.floor({{ config.MAX_CONTENT_LENGTH }} / (1024 * 1024));
+</script>
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 {% endblock %}

@@ -73,6 +73,14 @@ def allowed_file(filename):
 def index():
     return render_template('index.html')
 
+@app.route('/config')
+def get_config():
+    """Return client configuration including file size limits"""
+    return jsonify({
+        'max_file_size': MAX_CONTENT_LENGTH,
+        'max_file_size_mb': MAX_CONTENT_LENGTH // (1024 * 1024)
+    })
+
 @app.route('/admin')
 def admin_dashboard():
     return render_template('admin.html')
