@@ -36,9 +36,13 @@ document.addEventListener('DOMContentLoaded', function() {
             maxFileSizeMB = config.max_file_size_mb;
             console.log('Loaded server config:', config);
             console.log('Updated maxFileSizeMB to:', maxFileSizeMB);
+            
+            // Update file limit notice based on environment
+            updateFileLimitNotice();
         })
         .catch(error => {
             console.warn('Failed to load server config, using defaults:', error);
+            updateFileLimitNotice();
         });
     
     // Event listeners
@@ -105,6 +109,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // window.addEventListener('beforeunload', cleanupFiles);
     
     // Functions
+    function updateFileLimitNotice() {
+        const fileLimitText = document.getElementById('file-limit-text');
+        const fileLimitNotice = document.getElementById('file-limit-notice');
+        
+        if (!fileLimitText || !fileLimitNotice) return;
+        
+        const deploymentLimit = 32;
+        const isDevelopment = window.location.hostname.includes('replit.dev') || 
+                            window.location.hostname === 'localhost' || 
+                            window.location.hostname === '127.0.0.1';
+        
+        if (isDevelopment) {
+            fileLimitText.textContent = `開発環境: 最大${maxFileSizeMB}MBまでのファイルをアップロード可能`;
+            fileLimitNotice.className = 'alert alert-success py-2 px-3 mt-2';
+        } else {
+            fileLimitText.textContent = `デプロイ環境: 最大${deploymentLimit}MBまでのファイルをアップロード可能（開発環境では${maxFileSizeMB}MB）`;
+            fileLimitNotice.className = 'alert alert-warning py-2 px-3 mt-2';
+        }
+    }
+    
     function handleFileSelection(e) {
         if (e.target.files.length) {
             handleFile(e.target.files[0]);
