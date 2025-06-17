@@ -396,9 +396,27 @@ def split_file():
 @app.route('/download/<path:filename>', methods=['GET'])
 def download_file(filename):
     if 'output_dir' not in session:
+        logger.error("Download failed: No output_dir in session")
         return "No files available for download", 400
     
     try:
+        output_dir = session['output_dir']
+        file_path = os.path.join(output_dir, filename)
+        
+        logger.info(f"Download request: {filename}")
+        logger.info(f"Output directory: {output_dir}")
+        logger.info(f"File path: {file_path}")
+        logger.info(f"Directory exists: {os.path.exists(output_dir)}")
+        logger.info(f"File exists: {os.path.exists(file_path)}")
+        
+        if os.path.exists(output_dir):
+            files_in_dir = os.listdir(output_dir)
+            logger.info(f"Files in directory: {files_in_dir}")
+        
+        if not os.path.exists(file_path):
+            logger.error(f"File not found: {file_path}")
+            return f"File not found: {filename}", 404
+        
         # Track download in database
         upload_id = session.get('upload_id')
         if upload_id:
@@ -412,17 +430,20 @@ def download_file(filename):
                 db.session.commit()
         
         return send_from_directory(
-            session['output_dir'],
+            output_dir,
             filename,
             as_attachment=True
         )
     except Exception as e:
         logger.error(f"Error during file download: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return f"Error downloading file: {str(e)}", 500
 
 @app.route('/download-all', methods=['GET'])
 def download_all():
     if 'output_files' not in session or 'session_id' not in session:
+        logger.error("Download-all failed: Missing session data")
         return "No files available for download", 400
     
     try:
@@ -430,6 +451,10 @@ def download_all():
         session_id = session['session_id']
         output_dir = session['output_dir']
         output_files = session.get('output_files', [])
+        
+        logger.info(f"Download-all request for session: {session_id}")
+        logger.info(f"Output directory: {output_dir}")
+        logger.info(f"Session output_files: {output_files}")
         
         # Check if output directory exists
         if not os.path.exists(output_dir):
@@ -441,6 +466,8 @@ def download_all():
         if os.path.exists(output_dir):
             actual_files = [f for f in os.listdir(output_dir) if os.path.isfile(os.path.join(output_dir, f))]
         
+        logger.info(f"Actual files in directory: {actual_files}")
+        
         if not actual_files:
             logger.error(f"No files found in output directory: {output_dir}")
             return "No segment files found to download.", 400
@@ -448,6 +475,8 @@ def download_all():
         # Create zip file with all segments
         zip_filename = f"{session_id}_all_segments.zip"
         zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
+        
+        logger.info(f"Creating ZIP file: {zip_path}")
         
         # Remove existing zip file if it exists
         if os.path.exists(zip_path):
