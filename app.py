@@ -40,18 +40,18 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Initialize the app with the database extension
-db.init_app(app)
-
 # Configuration
 UPLOAD_FOLDER = os.path.join(tempfile.gettempdir(), 'audio_uploads')
 OUTPUT_FOLDER = os.path.join(tempfile.gettempdir(), 'audio_splits')
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma'}
 MAX_CONTENT_LENGTH = 200 * 1024 * 1024  # 200MB max file size
 
-# Optimized configuration for better performance
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
+# Flask configuration for deployment
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+# Initialize the app with the database extension
+db.init_app(app)
 
 # Create upload and output directories if they don't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -461,7 +461,19 @@ def get_upload_details(upload_id):
 # Error handlers
 @app.errorhandler(413)
 def request_entity_too_large(error):
-    flash(f'File too large. Maximum size is {MAX_CONTENT_LENGTH // (1024 * 1024)}MB')
+    max_size_mb = MAX_CONTENT_LENGTH // (1024 * 1024)
+    error_message = f'File too large. Maximum size is {max_size_mb}MB. Please try a smaller file or split it before uploading.'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('Content-Type') == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'error': error_message,
+            'max_size_mb': max_size_mb,
+            'error_code': 'FILE_TOO_LARGE'
+        }), 413
+    
+    # For regular form requests
+    flash(error_message)
     return redirect(url_for('index'))
 
 @app.errorhandler(500)

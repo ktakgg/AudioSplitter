@@ -1,0 +1,22 @@
+[run]
+command = "gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app"
+
+[deployment]
+run = ["sh", "-c", "gunicorn --bind 0.0.0.0:5000 --reuse-port --workers 2 --timeout 300 --max-requests 1000 main:app"]
+deploymentTarget = "cloudrun"
+
+[deployment.env]
+PYTHONPATH = "."
+
+[nix]
+channel = "stable-24.05"
+
+[nix.uv]
+enable = true
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[env]
+SESSION_SECRET = "your_session_secret_here"
