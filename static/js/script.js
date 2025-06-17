@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Check file size (max 200MB)
         const maxSize = 200 * 1024 * 1024;
         if (file.size > maxSize) {
-            showError("File is too large. Maximum size is 200MB.");
+            showError(`File too large (${formatFileSize(file.size)}). Maximum size is 200MB. Please try a smaller file or split it before uploading.`);
             return;
         }
         
@@ -182,6 +182,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     showError("Invalid response from server");
                     resetUploadState();
                 }
+            } else if (xhr.status === 413) {
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    showError(response.error || "File too large. Maximum size is 200MB. Please try a smaller file.");
+                } catch (e) {
+                    showError("File too large. Maximum size is 200MB. Please try a smaller file or split it before uploading.");
+                }
+                resetUploadState();
             } else {
                 try {
                     const response = JSON.parse(xhr.responseText);
