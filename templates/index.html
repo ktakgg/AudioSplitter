@@ -167,47 +167,47 @@
                                 <small id="file-size" class="text-muted"></small>
                             </div>
                             <button id="remove-file" class="btn btn-sm btn-outline-danger ms-auto">
-                                <i class="fas fa-times"></i>
+                                <i class="fas fa-times"></i> 削除
                             </button>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Step 2: Configure Split Options -->
+                <!-- ステップ 2: 分割設定 -->
                 <div id="split-options" class="mt-4 d-none">
-                    <h5 class="mb-3"><span class="badge bg-info me-2">2</span>Configure Split Options</h5>
+                    <h5 class="mb-3"><span class="badge bg-primary me-2">2</span>分割設定</h5>
                     <form id="split-form">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="segment-size" class="form-label">Segment Size <span id="size-unit">(seconds)</span></label>
+                                <label for="segment-size" class="form-label">セグメントサイズ <span id="size-unit">（MB）</span></label>
                                 <input type="number" class="form-control" id="segment-size" min="1" value="10" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="split-type" class="form-label">Split By</label>
+                                <label for="split-type" class="form-label">分割方法</label>
                                 <select class="form-select" id="split-type">
-                                    <option value="seconds" selected>Seconds</option>
-                                    <option value="megabytes">Megabytes (MB)</option>
+                                    <option value="seconds">秒数で分割</option>
+                                    <option value="megabytes" selected>容量で分割（MB）</option>
                                 </select>
                             </div>
                         </div>
                         <div class="d-grid mt-3">
-                            <button type="submit" id="split-button" class="btn btn-info">
-                                <i class="fas fa-cut me-2"></i>Split Audio
+                            <button type="submit" id="split-button" class="btn btn-success">
+                                <i class="fas fa-cut me-2"></i>音声を分割
                             </button>
                         </div>
                     </form>
                 </div>
                 
-                <!-- Step 3: Results -->
+                <!-- ステップ 3: 結果 -->
                 <div id="results-section" class="mt-4 d-none">
-                    <h5 class="mb-3"><span class="badge bg-info me-2">3</span>Download Split Segments</h5>
+                    <h5 class="mb-3"><span class="badge bg-primary me-2">3</span>分割したセグメントをダウンロード</h5>
                     <div class="d-grid gap-2 mb-3">
-                        <button id="download-all" class="btn btn-outline-info">
-                            <i class="fas fa-download me-2"></i>Download All Segments as ZIP
+                        <button id="download-all" class="btn btn-outline-primary">
+                            <i class="fas fa-download me-2"></i>すべてのセグメントをZIPでダウンロード
                         </button>
                     </div>
                     <div class="list-group" id="segments-list">
-                        <!-- Segments will be listed here -->
+                        <!-- セグメントがここに表示されます -->
                     </div>
                 </div>
             </div>

@@ -57,9 +57,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     splitType.addEventListener('change', (e) => {
         if (e.target.value === 'seconds') {
-            sizeUnit.textContent = '(seconds)';
+            sizeUnit.textContent = '（秒）';
         } else if (e.target.value === 'megabytes') {
-            sizeUnit.textContent = '(MB)';
+            sizeUnit.textContent = '（MB）';
         }
     });
     
@@ -97,19 +97,19 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Check file extension (more reliable than MIME type)
         if (!allowedExtensions.test(file.name)) {
-            showError("Invalid file type. Please upload an audio file (MP3, WAV, OGG, M4A, FLAC, AAC, WMA).");
+            showError("無効なファイル形式です。音声ファイル（MP3, WAV, OGG, M4A, FLAC, AAC, WMA）をアップロードしてください。");
             return;
         }
         
         // Check file size using server-configured limit
         if (file.size > maxFileSize) {
-            showError(`File too large (${formatFileSize(file.size)}). Maximum size is ${maxFileSizeMB}MB. Please try a smaller file or split it before uploading.`);
+            showError(`ファイルサイズが大きすぎます（${formatFileSize(file.size)}）。最大サイズは${maxFileSizeMB}MBです。より小さなファイルを選択してください。`);
             return;
         }
         
         // Check if file is empty
         if (file.size === 0) {
-            showError("File is empty. Please select a valid audio file.");
+            showError("ファイルが空です。有効な音声ファイルを選択してください。");
             return;
         }
         
@@ -197,9 +197,9 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (xhr.status === 413) {
                 try {
                     const response = JSON.parse(xhr.responseText);
-                    showError(response.error || `File too large. Maximum size is ${maxFileSizeMB}MB. Please try a smaller file.`);
+                    showError(response.error || `ファイルサイズが大きすぎます。最大サイズは${maxFileSizeMB}MBです。より小さなファイルを選択してください。`);
                 } catch (e) {
-                    showError(`File too large. Maximum size is ${maxFileSizeMB}MB. Please try a smaller file or split it before uploading.`);
+                    showError(`ファイルサイズが大きすぎます。最大サイズは${maxFileSizeMB}MBです。より小さなファイルを分割してからアップロードしてください。`);
                 }
                 resetUploadState();
             } else {
@@ -289,9 +289,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             // Handle timeout errors specifically
             if (error.name === 'AbortError') {
-                showError("Operation timed out. The file may be too large to process.");
+                showError("処理がタイムアウトしました。ファイルサイズが大きすぎる可能性があります。");
             } else {
-                showError(error.message || "Error splitting file");
+                showError(error.message || "ファイル分割中にエラーが発生しました");
             }
         })
         .finally(() => {
