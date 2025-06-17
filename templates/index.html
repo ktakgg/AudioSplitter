@@ -153,8 +153,12 @@
                         <button id="browse-button" class="btn btn-primary">ファイルを選択</button>
                         <input type="file" id="file-input" accept=".mp3,.wav,.ogg,.m4a,.flac,.aac,.wma" class="d-none">
                         <p class="text-muted mt-2">
-                            <small>対応形式: MP3, WAV, OGG, M4A, FLAC, AAC, WMA（最大: 200MB）</small>
+                            <small>対応形式: MP3, WAV, OGG, M4A, FLAC, AAC, WMA</small>
                         </p>
+                        <div id="file-limit-notice" class="alert alert-info py-2 px-3 mt-2" style="font-size: 0.875rem;">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <span id="file-limit-text">ファイルサイズ制限を確認中...</span>
+                        </div>
                     </div>
 
                     <!-- アップロード中のプログレスバー -->

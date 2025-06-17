@@ -15,7 +15,7 @@ concurrency = 10
 [deployment.env]
 PYTHONPATH = "."
 GUNICORN_CMD_ARGS = "--timeout 600 --max-requests 1000 --limit-request-line 8190 --limit-request-field_size 8190"
-FLASK_MAX_CONTENT_LENGTH = "524288000"
+FLASK_MAX_CONTENT_LENGTH = "209715200"
 REPLIT_DEPLOYMENT = "1"
 
 [nix]

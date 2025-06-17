@@ -125,9 +125,21 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Check file size using server-configured limit
-        if (file.size > maxFileSize) {
-            showError(`ファイルサイズが大きすぎます（${formatFileSize(file.size)}）。最大サイズは${maxFileSizeMB}MBです。より小さなファイルを選択してください。`);
+        // Check file size with deployment-specific limits
+        const deploymentLimit = 32 * 1024 * 1024; // 32MB limit for deployment
+        const isDevelopment = window.location.hostname.includes('replit.dev') || 
+                            window.location.hostname === 'localhost' || 
+                            window.location.hostname === '127.0.0.1';
+        
+        const effectiveLimit = isDevelopment ? maxFileSize : deploymentLimit;
+        const effectiveLimitMB = Math.floor(effectiveLimit / (1024 * 1024));
+        
+        if (file.size > effectiveLimit) {
+            if (isDevelopment) {
+                showError(`ファイルサイズが大きすぎます（${formatFileSize(file.size)}）。最大サイズは${maxFileSizeMB}MBです。より小さなファイルを選択してください。`);
+            } else {
+                showError(`デプロイ環境では${effectiveLimitMB}MBまでのファイルのみアップロード可能です（現在：${formatFileSize(file.size)}）。より小さなファイルを選択するか、開発環境をご利用ください。`);
+            }
             return;
         }
         
@@ -219,11 +231,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     resetUploadState();
                 }
             } else if (xhr.status === 413) {
+                const isDevelopment = window.location.hostname.includes('replit.dev') || 
+                                    window.location.hostname === 'localhost' || 
+                                    window.location.hostname === '127.0.0.1';
+                
                 try {
                     const response = JSON.parse(xhr.responseText);
                     showError(response.error || `ファイルサイズが大きすぎます。最大サイズは${maxFileSizeMB}MBです。より小さなファイルを選択してください。`);
                 } catch (e) {
-                    showError(`ファイルサイズが大きすぎます。最大サイズは${maxFileSizeMB}MBです。より小さなファイルを分割してからアップロードしてください。`);
+                    if (isDevelopment) {
+                        showError(`ファイルサイズが大きすぎます。最大サイズは${maxFileSizeMB}MBです。より小さなファイルを分割してからアップロードしてください。`);
+                    } else {
+                        showError(`デプロイ環境では32MBまでのファイルのみアップロード可能です。より小さなファイルを選択するか、開発環境をご利用ください。`);
+                    }
                 }
                 resetUploadState();
             } else {

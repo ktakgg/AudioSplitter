@@ -17,4 +17,4 @@ steps:
       - '--cpu=2'
       - '--timeout=600'
       - '--max-instances=10'
-      - '--set-env-vars=FLASK_MAX_CONTENT_LENGTH=524288000,GUNICORN_TIMEOUT=600'
+      - '--set-env-vars=FLASK_MAX_CONTENT_LENGTH=209715200,GUNICORN_TIMEOUT=600'
