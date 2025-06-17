@@ -337,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             
             const downloadBtn = document.createElement('button');
-            downloadBtn.className = 'btn btn-sm btn-outline-info';
+            downloadBtn.className = 'btn btn-sm btn-outline-info download-btn';
             downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
             
             listItem.appendChild(fileInfo);
@@ -419,9 +419,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Disable download buttons
                 document.querySelectorAll('.download-btn').forEach(btn => {
                     btn.disabled = true;
-                    btn.textContent = '削除済み';
-                    btn.classList.remove('btn-primary');
+                    btn.innerHTML = '<i class="fas fa-ban"></i>';
+                    btn.classList.remove('btn-outline-info');
                     btn.classList.add('btn-secondary');
+                });
+                
+                // Disable individual download links
+                document.querySelectorAll('.list-group-item').forEach(item => {
+                    item.style.pointerEvents = 'none';
+                    item.style.opacity = '0.5';
+                    item.classList.remove('list-group-item-action');
                 });
                 
                 const downloadAllBtn = document.getElementById('download-all');

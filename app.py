@@ -347,19 +347,35 @@ def download_all():
     
     try:
         # Create a zip file with all segments
-        zip_path = os.path.join(OUTPUT_FOLDER, f"{session['session_id']}_all_segments.zip")
+        session_id = session['session_id']
+        zip_filename = f"{session_id}_all_segments.zip"
+        zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
         output_dir = session['output_dir']
         
-        shutil.make_archive(
-            zip_path.replace('.zip', ''),
-            'zip',
-            output_dir
-        )
+        # Remove existing zip file if it exists
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
+        
+        # Create zip file with all segments
+        import zipfile
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(output_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, output_dir)
+                    zipf.write(file_path, arcname)
+        
+        # Verify zip file was created and has content
+        if not os.path.exists(zip_path) or os.path.getsize(zip_path) == 0:
+            return "Error: ZIP file creation failed", 500
+            
+        logger.info(f"Created ZIP file: {zip_path} ({os.path.getsize(zip_path)} bytes)")
         
         return send_from_directory(
             OUTPUT_FOLDER,
-            f"{session['session_id']}_all_segments.zip",
-            as_attachment=True
+            zip_filename,
+            as_attachment=True,
+            download_name=f"audio_segments_{session['original_filename'].split('.')[0]}.zip"
         )
     except Exception as e:
         logger.error(f"Error during zip file download: {str(e)}")
@@ -398,9 +414,14 @@ def delete_files():
         
         session_id = data['session_id']
         
-        # Verify session matches current user session
-        if session.get('session_id') != session_id:
-            return jsonify({'error': 'Invalid session'}), 403
+        # Verify session matches current user session (allow both current session and the provided session_id)
+        current_session_id = session.get('session_id')
+        if current_session_id != session_id:
+            # Check if the provided session_id exists in the database and belongs to recent uploads
+            from models import FileUpload
+            upload_record = FileUpload.query.filter_by(session_id=session_id).first()
+            if not upload_record:
+                return jsonify({'error': 'Invalid session'}), 403
         
         upload_dir = os.path.join(UPLOAD_FOLDER, session_id)
         output_dir = os.path.join(OUTPUT_FOLDER, session_id)
@@ -426,10 +447,18 @@ def delete_files():
                 upload_record.status = 'deleted'
                 db.session.commit()
         
-        # Clear session data
+        # Clear session data related to files
         session.pop('output_files', None)
         session.pop('filepath', None)
         session.pop('output_dir', None)
+        
+        # Also clean up any ZIP files
+        try:
+            zip_path = os.path.join(OUTPUT_FOLDER, f"{session_id}_all_segments.zip")
+            if os.path.exists(zip_path):
+                os.remove(zip_path)
+        except:
+            pass
         
         logger.info(f"Files deleted successfully for session: {session_id}")
         
