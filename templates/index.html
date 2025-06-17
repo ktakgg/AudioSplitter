@@ -156,6 +156,16 @@
                             <small>対応形式: MP3, WAV, OGG, M4A, FLAC, AAC, WMA（最大: 200MB）</small>
                         </p>
                     </div>
+                    
+                    <!-- アップロード用プログレスバー -->
+                    <div id="upload-progress-container" class="mb-3 d-none">
+                        <div class="progress">
+                            <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div class="text-center mt-2">
+                            <small class="text-muted">ファイルをアップロード中...</small>
+                        </div>
+                    </div>
 
                     <div id="file-info" class="file-info mb-3 d-none">
                         <div class="d-flex align-items-center">

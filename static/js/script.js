@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultsSection = document.getElementById('results-section');
     const segmentsList = document.getElementById('segments-list');
     const downloadAllBtn = document.getElementById('download-all');
+    const uploadProgressContainer = document.getElementById('upload-progress-container');
+    const uploadProgressBar = document.getElementById('upload-progress-bar');
     const progressContainer = document.getElementById('progress-container');
     const progressBar = document.getElementById('progress-bar');
     const errorToast = document.getElementById('error-toast');
@@ -168,9 +170,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function uploadFile(file) {
-        // Show progress container
-        progressContainer.classList.remove('d-none');
-        progressBar.style.width = '0%';
+        // Show upload progress container
+        uploadProgressContainer.classList.remove('d-none');
+        uploadProgressBar.style.width = '0%';
         
         const formData = new FormData();
         formData.append('file', file);
@@ -185,18 +187,18 @@ document.addEventListener('DOMContentLoaded', function() {
         xhr.upload.onprogress = (e) => {
             if (e.lengthComputable) {
                 const percent = (e.loaded / e.total) * 100;
-                progressBar.style.width = percent + '%';
+                uploadProgressBar.style.width = percent + '%';
             }
         };
         
         xhr.onload = function() {
-            progressContainer.classList.add('d-none');
+            uploadProgressContainer.classList.add('d-none');
             
             if (xhr.status === 200) {
                 try {
                     const response = JSON.parse(xhr.responseText);
                     if (response.success) {
-                        progressBar.style.width = '100%';
+                        uploadProgressBar.style.width = '100%';
                         sessionId = response.session_id;
                         
                         console.log('Upload successful:', response);
