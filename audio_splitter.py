@@ -26,10 +26,15 @@ def split_audio_file_ffmpeg(input_file, output_dir, segment_size, split_type='se
     """
     try:
         os.makedirs(output_dir, exist_ok=True)
+        logger.info(f"Created output directory: {output_dir}")
+        logger.info(f"Directory exists: {os.path.exists(output_dir)}")
+        logger.info(f"Directory writable: {os.access(output_dir, os.W_OK)}")
         
         # Get file size for optimization decisions
         file_size_mb = os.path.getsize(input_file) / (1024 * 1024)
         logger.info(f"Processing file: {file_size_mb:.1f}MB")
+        logger.info(f"Input file exists: {os.path.exists(input_file)}")
+        logger.info(f"Input file readable: {os.access(input_file, os.R_OK)}")
         
         # Get audio duration
         duration = get_audio_duration(input_file)
@@ -99,20 +104,34 @@ def split_audio_file_ffmpeg(input_file, output_dir, segment_size, split_type='se
                 ]
             
             try:
+                logger.info(f"Running ffmpeg command: {' '.join(cmd)}")
                 # Run ffmpeg with timeout
                 result = subprocess.run(
                     cmd, 
                     capture_output=True, 
                     text=True, 
-                    timeout=60,  # 1 minute timeout per segment
-                    cwd=output_dir
+                    timeout=60  # 1 minute timeout per segment
                 )
+                
+                logger.info(f"ffmpeg exit code: {result.returncode}")
+                if result.stdout:
+                    logger.info(f"ffmpeg stdout: {result.stdout}")
+                if result.stderr:
+                    logger.info(f"ffmpeg stderr: {result.stderr}")
+                
+                logger.info(f"Output file exists after ffmpeg: {os.path.exists(output_path)}")
+                if os.path.exists(output_path):
+                    file_size = os.path.getsize(output_path)
+                    logger.info(f"Output file size: {file_size} bytes")
                 
                 if result.returncode == 0 and os.path.exists(output_path):
                     output_files.append(output_filename)
-                    logger.info(f"Successfully created segment {i+1}")
+                    logger.info(f"Successfully created segment {i+1}: {output_filename}")
                 else:
-                    logger.error(f"ffmpeg failed for segment {i+1}: {result.stderr}")
+                    logger.error(f"ffmpeg failed for segment {i+1}")
+                    logger.error(f"Return code: {result.returncode}")
+                    logger.error(f"stderr: {result.stderr}")
+                    logger.error(f"stdout: {result.stdout}")
                     
             except subprocess.TimeoutExpired:
                 logger.error(f"Timeout creating segment {i+1}")
