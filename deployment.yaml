@@ -15,8 +15,8 @@ spec:
         # Increase request timeout for large file uploads
         run.googleapis.com/timeout: "600s"
         # Configure memory and CPU for large file processing
-        run.googleapis.com/memory: "2Gi"
-        run.googleapis.com/cpu: "2"
+        run.googleapis.com/memory: "4Gi"
+        run.googleapis.com/cpu: "4"
         # Configure concurrency for stability
         autoscaling.knative.dev/maxScale: "10"
         run.googleapis.com/execution-environment: gen2

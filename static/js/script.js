@@ -149,21 +149,17 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Check file size with deployment-specific limits
-        const deploymentLimit = 32 * 1024 * 1024; // 32MB limit for deployment
+        // Check file size with chunked upload support for deployment
+        const deploymentChunkLimit = 32 * 1024 * 1024; // 32MB per chunk for deployment
         const isDevelopment = window.location.hostname.includes('replit.dev') || 
                             window.location.hostname === 'localhost' || 
                             window.location.hostname === '127.0.0.1';
         
-        const effectiveLimit = isDevelopment ? maxFileSize : deploymentLimit;
-        const effectiveLimitMB = Math.floor(effectiveLimit / (1024 * 1024));
+        // Use chunked upload for large files in deployment
+        const shouldUseChunkedUpload = !isDevelopment && file.size > deploymentChunkLimit;
         
-        if (file.size > effectiveLimit) {
-            if (isDevelopment) {
-                showError(`ファイルサイズが大きすぎます（${formatFileSize(file.size)}）。最大サイズは${maxFileSizeMB}MBです。より小さなファイルを選択してください。`);
-            } else {
-                showError(`デプロイ環境では${effectiveLimitMB}MBまでのファイルのみアップロード可能です（現在：${formatFileSize(file.size)}）。より小さなファイルを選択するか、開発環境をご利用ください。`);
-            }
+        if (isDevelopment && file.size > maxFileSize) {
+            showError(`ファイルサイズが大きすぎます（${formatFileSize(file.size)}）。最大サイズは${maxFileSizeMB}MBです。より小さなファイルを選択してください。`);
             return;
         }
         
@@ -179,8 +175,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update UI
         showFileInfo(file);
         
-        // Upload file
-        uploadFile(file);
+        // Upload file (chunked for large files in deployment)
+        if (shouldUseChunkedUpload) {
+            uploadFileChunked(file);
+        } else {
+            uploadFile(file);
+        }
     }
     
     function showFileInfo(file) {

@@ -90,6 +90,89 @@ def get_config():
 def admin_dashboard():
     return render_template('admin.html')
 
+@app.route('/upload-chunk', methods=['POST'])
+def upload_chunk():
+    """Handle chunked file uploads for large files"""
+    try:
+        chunk = request.files.get('chunk')
+        chunk_number = int(request.form.get('chunkNumber', 0))
+        total_chunks = int(request.form.get('totalChunks', 1))
+        filename = request.form.get('filename', '')
+        file_size = int(request.form.get('fileSize', 0))
+        
+        if not chunk or not filename:
+            return jsonify({'error': 'Missing chunk data'}), 400
+        
+        # Validate file type
+        if not allowed_file(filename):
+            return jsonify({'error': f'Unsupported file format. Allowed formats: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
+        
+        # Get or create session ID
+        session_id = session.get('session_id') or str(uuid.uuid4())
+        session['session_id'] = session_id
+        
+        # Create directories
+        session_upload_dir = os.path.join(UPLOAD_FOLDER, session_id)
+        os.makedirs(session_upload_dir, exist_ok=True)
+        
+        # Save chunk
+        secure_name = secure_filename(filename)
+        chunk_path = os.path.join(session_upload_dir, f"{secure_name}.part{chunk_number}")
+        chunk.save(chunk_path)
+        
+        # Check if all chunks are uploaded
+        chunks_received = len([f for f in os.listdir(session_upload_dir) if f.startswith(f"{secure_name}.part")])
+        
+        if chunks_received == total_chunks:
+            # Assemble the complete file
+            final_path = os.path.join(session_upload_dir, secure_name)
+            with open(final_path, 'wb') as final_file:
+                for i in range(total_chunks):
+                    chunk_file = os.path.join(session_upload_dir, f"{secure_name}.part{i}")
+                    with open(chunk_file, 'rb') as part:
+                        final_file.write(part.read())
+                    os.remove(chunk_file)  # Clean up chunk
+            
+            # Create database record
+            from models import FileUpload
+            file_format = secure_name.rsplit('.', 1)[1].lower() if '.' in secure_name else 'unknown'
+            
+            upload_record = FileUpload()
+            upload_record.session_id = session_id
+            upload_record.original_filename = secure_name
+            upload_record.file_size = file_size
+            upload_record.file_format = file_format
+            upload_record.status = 'uploaded'
+            db.session.add(upload_record)
+            db.session.commit()
+            
+            # Store session data
+            session['upload_id'] = upload_record.id
+            session['original_filename'] = secure_name
+            session['filepath'] = final_path
+            session['output_dir'] = os.path.join(OUTPUT_FOLDER, session_id)
+            os.makedirs(session['output_dir'], exist_ok=True)
+            
+            return jsonify({
+                'success': True,
+                'complete': True,
+                'filename': secure_name,
+                'session_id': session_id,
+                'file_size': file_size,
+                'upload_id': upload_record.id
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'complete': False,
+                'chunks_received': chunks_received,
+                'total_chunks': total_chunks
+            })
+            
+    except Exception as e:
+        logger.error(f"Error during chunk upload: {str(e)}")
+        return jsonify({'error': f'Chunk upload failed: {str(e)}'}), 500
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
