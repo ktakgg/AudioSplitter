@@ -1,233 +1,191 @@
 import os
 import logging
 import math
-from pydub import AudioSegment
-from pydub.utils import mediainfo
+import subprocess
+import tempfile
 
 logger = logging.getLogger(__name__)
 
-def get_audio_format(filename):
-    """
-    Returns the format of the audio file based on its extension.
-    Ensures compatibility with common audio formats.
-    """
-    ext = os.path.splitext(filename)[1][1:].lower()
-    # Format mapping for better ffmpeg compatibility
-    format_map = {
-        'm4a': 'mp4',
-        'aac': 'mp4',
-        'wma': 'asf'
-    }
-    return format_map.get(ext, ext)
-
-def calculate_segment_size_mb(input_file, segment_size_mb):
-    """
-    Calculate precise segment duration for megabyte-based splitting.
-    Uses audio metadata for more accurate estimation.
-    """
+def get_audio_duration(input_file):
+    """Get audio duration using ffprobe."""
     try:
-        # Get file metadata with better error handling
-        info = mediainfo(input_file)
-        
-        # Handle various bitrate formats
-        bitrate_str = info.get('bit_rate', '128000')
-        if isinstance(bitrate_str, str):
-            # Remove any non-numeric characters except decimal point
-            import re
-            bitrate_str = re.sub(r'[^\d.]', '', bitrate_str)
-            try:
-                bitrate = int(float(bitrate_str))
-            except (ValueError, TypeError):
-                bitrate = 128000
-        else:
-            bitrate = int(bitrate_str) if bitrate_str else 128000
-        
-        # Calculate segment duration in milliseconds
-        # Formula: (target_mb * 8 * 1024 * 1024) / bitrate * 1000
-        segment_ms = (segment_size_mb * 8 * 1024 * 1024 / bitrate) * 1000
-        
-        # Ensure minimum segment size (5 seconds)
-        return max(int(segment_ms), 5000)
-    
+        cmd = [
+            'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+            '-of', 'csv=p=0', input_file
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            return float(result.stdout.strip())
     except Exception as e:
-        logger.warning(f"Error calculating segment size from metadata: {e}")
-        # Fallback calculation using file size
-        file_size = os.path.getsize(input_file)
-        file_size_mb = file_size / (1024 * 1024)
-        
-        # Get audio duration for ratio calculation
-        audio = AudioSegment.from_file(input_file)
-        total_duration = len(audio)
-        
-        duration_per_mb = total_duration / file_size_mb
-        return max(int(duration_per_mb * segment_size_mb * 0.9), 5000)
+        logger.warning(f"Failed to get duration with ffprobe: {e}")
+    return None
 
-def split_audio_file(input_file, output_dir, segment_size, split_type='seconds'):
+def split_audio_file_ffmpeg(input_file, output_dir, segment_size, split_type='seconds'):
     """
-    Split an audio file into segments with enhanced precision and performance.
-    
-    Args:
-        input_file (str): Path to the input audio file
-        output_dir (str): Directory to save the split segments
-        segment_size (int): Size of each segment
-        split_type (str): Type of splitting - 'seconds', 'megabytes'
-        
-    Returns:
-        list: List of output filenames
+    Split audio file using ffmpeg directly for better performance and reliability.
     """
     try:
-        # Make sure output directory exists
         os.makedirs(output_dir, exist_ok=True)
         
-        # Get the file format and size
-        file_format = get_audio_format(input_file)
+        # Get file size for optimization decisions
         file_size_mb = os.path.getsize(input_file) / (1024 * 1024)
+        logger.info(f"Processing file: {file_size_mb:.1f}MB")
         
-        # Load the audio file with optimized parameters
-        logger.info(f"Loading audio file: {input_file}")
+        # Get audio duration
+        duration = get_audio_duration(input_file)
+        if not duration:
+            logger.error("Could not determine audio duration")
+            return []
         
-        # Use streaming mode for large files to reduce memory usage
-        try:
-            audio = AudioSegment.from_file(input_file, format=file_format)
-            
-            # If file is very large (>50MB), reduce quality for faster processing
-            if file_size_mb > 50:
-                logger.info(f"Large file detected ({file_size_mb:.1f}MB), using optimized processing")
-                # Convert to mono and lower sample rate for faster processing
-                if audio.channels > 1:
-                    audio = audio.set_channels(1)
-                if audio.frame_rate > 22050:
-                    audio = audio.set_frame_rate(22050)
-        except Exception as e:
-            logger.warning(f"Failed to load with format {file_format}, trying automatic detection: {e}")
-            audio = AudioSegment.from_file(input_file)
-            # Apply same optimizations for auto-detected files
-            if file_size_mb > 50:
-                if audio.channels > 1:
-                    audio = audio.set_channels(1)
-                if audio.frame_rate > 22050:
-                    audio = audio.set_frame_rate(22050)
+        logger.info(f"Audio duration: {duration:.1f} seconds")
         
-        # Get total duration in milliseconds
-        total_duration = len(audio)
-        logger.info(f"Total duration: {total_duration}ms ({total_duration/1000:.1f}s)")
-        
-        # Calculate segment size with improved precision
+        # Calculate segment duration
         if split_type == 'seconds':
-            segment_ms = segment_size * 1000
-        elif split_type == 'megabytes':
-            segment_ms = calculate_segment_size_mb(input_file, segment_size)
-            logger.info(f"Calculated segment duration: {segment_ms}ms for {segment_size}MB target")
-        else:
-            segment_ms = segment_size * 1000
+            segment_duration = segment_size
+        else:  # megabytes
+            # Rough estimation: assume average bitrate
+            estimated_bitrate = (file_size_mb * 8) / duration  # Mbps
+            segment_duration = (segment_size * 8) / estimated_bitrate if estimated_bitrate > 0 else 60
         
-        # Calculate number of segments more precisely
-        num_segments = max(1, math.ceil(total_duration / segment_ms))
+        # Limit segments for large files to prevent timeout
+        max_segments = 6 if file_size_mb > 30 else 20
+        num_segments = min(max_segments, math.ceil(duration / segment_duration))
+        segment_duration = duration / num_segments
         
-        # For better distribution, recalculate segment size
-        if num_segments > 1:
-            segment_ms = total_duration / num_segments
+        logger.info(f"Creating {num_segments} segments of {segment_duration:.1f}s each")
         
-        logger.info(f"Will create {num_segments} segments of ~{segment_ms/1000:.1f}s each")
-        
-        # Split the audio with optimized processing
-        output_files = []
+        # Generate output filenames
         base_filename = os.path.basename(input_file)
         base_name, _ = os.path.splitext(base_filename)
-        
-        # Sanitize base name to avoid any pattern matching issues
+        # Sanitize filename
         import re
         base_name = re.sub(r'[^\w\-_.]', '_', base_name)
         
-        # Process segments with optimized settings
+        output_files = []
+        
+        # Use WAV format for large files to ensure speed
+        output_format = 'wav' if file_size_mb > 30 else 'mp3'
+        logger.info(f"Using {output_format.upper()} format for output")
+        
         for i in range(num_segments):
-            # Calculate precise start and end times
-            start_ms = int(i * segment_ms)
-            end_ms = int(min((i + 1) * segment_ms, total_duration))
+            start_time = i * segment_duration
             
-            # Skip if segment would be too short (less than 1 second)
-            if end_ms - start_ms < 1000:
-                continue
+            # Generate output filename
+            output_filename = f"{base_name}_part{i+1:02d}.{output_format}"
+            output_path = os.path.join(output_dir, output_filename)
             
-            logger.info(f"Processing segment {i+1}/{num_segments}: {start_ms/1000:.1f}s - {end_ms/1000:.1f}s")
+            logger.info(f"Creating segment {i+1}/{num_segments}: {start_time:.1f}s - {start_time + segment_duration:.1f}s")
+            
+            # Build ffmpeg command
+            if output_format == 'wav':
+                cmd = [
+                    'ffmpeg', '-y', '-i', input_file,
+                    '-ss', str(start_time),
+                    '-t', str(segment_duration),
+                    '-c:a', 'pcm_s16le',  # Fast WAV encoding
+                    '-ac', '1',  # Mono for speed
+                    '-ar', '16000',  # Lower sample rate
+                    output_path
+                ]
+            else:
+                cmd = [
+                    'ffmpeg', '-y', '-i', input_file,
+                    '-ss', str(start_time),
+                    '-t', str(segment_duration),
+                    '-c:a', 'libmp3lame',
+                    '-b:a', '128k',
+                    '-ac', '2',
+                    output_path
+                ]
             
             try:
-                # Extract segment efficiently
-                segment = audio[start_ms:end_ms]
+                # Run ffmpeg with timeout
+                result = subprocess.run(
+                    cmd, 
+                    capture_output=True, 
+                    text=True, 
+                    timeout=60,  # 1 minute timeout per segment
+                    cwd=output_dir
+                )
                 
-                # Generate output filename
-                output_filename = f"{base_name}_part{i+1:02d}.mp3"
-                output_path = os.path.join(output_dir, output_filename)
-                
-                # Export with fast, reliable settings
-                export_success = False
-                export_error_details = []
-                
-                # Use optimized encoding based on file size
-                if file_size_mb > 50:
-                    # Fast encoding for large files
-                    export_attempts = [
-                        ("MP3 fast", lambda: segment.export(output_path, format="mp3", bitrate="96k")),
-                        ("WAV fallback", lambda: (
-                            segment.export(output_path.replace('.mp3', '.wav'), format="wav"),
-                            setattr(locals(), 'output_filename', output_filename.replace('.mp3', '.wav'))
-                        )[0])
-                    ]
-                else:
-                    # Standard quality for smaller files
-                    export_attempts = [
-                        ("MP3 standard", lambda: segment.export(output_path, format="mp3", bitrate="128k")),
-                        ("MP3 basic", lambda: segment.export(output_path, format="mp3")),
-                        ("WAV fallback", lambda: (
-                            segment.export(output_path.replace('.mp3', '.wav'), format="wav"),
-                            setattr(locals(), 'output_filename', output_filename.replace('.mp3', '.wav'))
-                        )[0])
-                    ]
-                
-                for attempt_name, export_func in export_attempts:
-                    try:
-                        logger.info(f"Attempting {attempt_name} export for segment {i+1}")
-                        export_func()
-                        if attempt_name == "WAV fallback":
-                            output_filename = output_filename.replace('.mp3', '.wav')
-                        export_success = True
-                        logger.info(f"Successfully exported segment {i+1} using {attempt_name}")
-                        break
-                    except Exception as e:
-                        error_detail = f"{attempt_name}: {str(e)}"
-                        export_error_details.append(error_detail)
-                        logger.warning(f"Export attempt {attempt_name} failed: {e}")
-                        
-                        # Check for specific pattern matching error
-                        if "string did not match the expected pattern" in str(e).lower():
-                            logger.error(f"Pattern matching error in {attempt_name}: {e}")
-                
-                if not export_success:
-                    error_msg = f"All export attempts failed for segment {i+1}: " + "; ".join(export_error_details)
-                    logger.error(error_msg)
-                    continue
-                
-                if export_success:
+                if result.returncode == 0 and os.path.exists(output_path):
                     output_files.append(output_filename)
-                
+                    logger.info(f"Successfully created segment {i+1}")
+                else:
+                    logger.error(f"ffmpeg failed for segment {i+1}: {result.stderr}")
+                    
+            except subprocess.TimeoutExpired:
+                logger.error(f"Timeout creating segment {i+1}")
+                continue
             except Exception as e:
-                logger.error(f"Error processing segment {i+1}: {e}")
+                logger.error(f"Error creating segment {i+1}: {e}")
                 continue
         
         logger.info(f"Successfully created {len(output_files)} segments")
         return output_files
-    
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Error splitting audio file: {error_msg}")
         
-        # Provide more specific error information
-        if "string did not match the expected pattern" in error_msg.lower():
-            logger.error("Pattern matching error detected - likely ffmpeg parameter issue")
-            raise Exception("Audio processing failed due to format compatibility issue. Please try with a different audio file or contact support.")
-        elif "no such file or directory" in error_msg.lower():
-            raise Exception("Audio file not found or cannot be accessed.")
-        elif "permission denied" in error_msg.lower():
-            raise Exception("Permission denied while processing audio file.")
+    except Exception as e:
+        logger.error(f"Error in ffmpeg audio splitting: {e}")
+        raise Exception(f"Audio processing failed: {str(e)}")
+
+def split_audio_file(input_file, output_dir, segment_size, split_type='seconds'):
+    """
+    Main split function that uses ffmpeg for better performance.
+    """
+    file_size_mb = os.path.getsize(input_file) / (1024 * 1024)
+    
+    # For large files, always use ffmpeg approach
+    if file_size_mb > 25:
+        logger.info("Using ffmpeg direct splitting for large file")
+        return split_audio_file_ffmpeg(input_file, output_dir, segment_size, split_type)
+    
+    # For smaller files, use the original pydub approach
+    logger.info("Using pydub splitting for small file")
+    try:
+        from pydub import AudioSegment
+        
+        # Load and process with pydub
+        audio = AudioSegment.from_file(input_file)
+        total_duration = len(audio)
+        
+        if split_type == 'seconds':
+            segment_ms = segment_size * 1000
         else:
-            raise Exception(f"Audio processing failed: {error_msg}")
+            # Simple estimation for megabytes
+            segment_ms = (segment_size * total_duration) // (file_size_mb)
+        
+        num_segments = max(1, math.ceil(total_duration / segment_ms))
+        if num_segments > 1:
+            segment_ms = total_duration / num_segments
+        
+        output_files = []
+        base_filename = os.path.basename(input_file)
+        base_name, _ = os.path.splitext(base_filename)
+        
+        import re
+        base_name = re.sub(r'[^\w\-_.]', '_', base_name)
+        
+        for i in range(num_segments):
+            start_ms = int(i * segment_ms)
+            end_ms = int(min((i + 1) * segment_ms, total_duration))
+            
+            if end_ms - start_ms < 1000:
+                continue
+            
+            segment = audio[start_ms:end_ms]
+            output_filename = f"{base_name}_part{i+1:02d}.mp3"
+            output_path = os.path.join(output_dir, output_filename)
+            
+            try:
+                segment.export(output_path, format="mp3", bitrate="128k")
+                output_files.append(output_filename)
+            except Exception as e:
+                logger.error(f"Failed to export segment {i+1}: {e}")
+                continue
+        
+        return output_files
+        
+    except Exception as e:
+        logger.error(f"Pydub splitting failed: {e}")
+        # Fallback to ffmpeg
+        return split_audio_file_ffmpeg(input_file, output_dir, segment_size, split_type)
