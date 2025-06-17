@@ -442,8 +442,38 @@ def download_file(filename):
 
 @app.route('/download-all', methods=['GET'])
 def download_all():
-    if 'output_files' not in session or 'session_id' not in session:
-        logger.error("Download-all failed: Missing session data")
+    logger.info(f"Download-all request - session keys: {list(session.keys())}")
+    
+    # For debugging, try to find any recent session with files
+    session_id = session.get('session_id')
+    output_dir = session.get('output_dir')
+    
+    if not session_id or not output_dir:
+        # Try to find the most recent upload session from database
+        try:
+            from models import FileUpload
+            recent_upload = FileUpload.query.filter_by(status='completed').order_by(FileUpload.processing_timestamp.desc()).first()
+            if recent_upload:
+                session_id = recent_upload.session_id
+                output_dir = os.path.join(OUTPUT_FOLDER, session_id)
+                logger.info(f"Using most recent upload session: {session_id}")
+            else:
+                logger.error("No recent completed uploads found")
+                return "No files available for download", 400
+        except Exception as e:
+            logger.error(f"Database query failed: {e}")
+            return "No files available for download", 400
+    
+    # Try to get output_files from session, or rebuild from directory
+    output_files = session.get('output_files', [])
+    if not output_files and os.path.exists(output_dir):
+        output_files = [f for f in os.listdir(output_dir) if os.path.isfile(os.path.join(output_dir, f))]
+        session['output_files'] = output_files  # Update session
+        session['session_id'] = session_id
+        session['output_dir'] = output_dir
+    
+    if not output_files:
+        logger.error(f"No output files found in {output_dir}")
         return "No files available for download", 400
     
     try:
