@@ -88,6 +88,7 @@ def upload_file():
     if not allowed_file(file.filename):
         return jsonify({'error': f'Unsupported file format. Allowed formats: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
     
+    session_id = None
     try:
         # Create unique session ID for this upload
         session_id = str(uuid.uuid4())
@@ -112,13 +113,12 @@ def upload_file():
         
         # Create database record
         from models import FileUpload
-        upload_record = FileUpload(
-            session_id=session_id,
-            original_filename=filename,
-            file_size=file_size,
-            file_format=file_format,
-            status='uploaded'
-        )
+        upload_record = FileUpload()
+        upload_record.session_id = session_id
+        upload_record.original_filename = filename
+        upload_record.file_size = file_size
+        upload_record.file_format = file_format
+        upload_record.status = 'uploaded'
         db.session.add(upload_record)
         db.session.commit()
         
@@ -140,6 +140,22 @@ def upload_file():
     
     except Exception as e:
         logger.error(f"Error during file upload: {str(e)}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Clean up session directories if they were created
+        try:
+            if session_id:
+                session_upload_dir = os.path.join(UPLOAD_FOLDER, session_id)
+                session_output_dir = os.path.join(OUTPUT_FOLDER, session_id)
+                if os.path.exists(session_upload_dir):
+                    shutil.rmtree(session_upload_dir)
+                if os.path.exists(session_output_dir):
+                    shutil.rmtree(session_output_dir)
+        except:
+            pass
+        
         return jsonify({'error': f'Error uploading file: {str(e)}'}), 500
 
 @app.route('/split', methods=['POST'])
@@ -211,15 +227,14 @@ def split_file():
                 total_size += file_size
                 
                 # Create segment record in database
-                segment_record = AudioSegment(
-                    upload_id=upload_id,
-                    filename=filename,
-                    segment_number=i + 1,
-                    file_size=file_size,
-                    duration_ms=0,  # Will be calculated later if needed
-                    start_time_ms=0,  # Will be calculated later if needed
-                    end_time_ms=0   # Will be calculated later if needed
-                )
+                segment_record = AudioSegment()
+                segment_record.upload_id = upload_id
+                segment_record.filename = filename
+                segment_record.segment_number = i + 1
+                segment_record.file_size = file_size
+                segment_record.duration_ms = 0  # Will be calculated later if needed
+                segment_record.start_time_ms = 0  # Will be calculated later if needed
+                segment_record.end_time_ms = 0   # Will be calculated later if needed
                 db.session.add(segment_record)
         
         # Update upload record with completion details

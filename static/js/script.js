@@ -75,19 +75,29 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function handleFile(file) {
-        // Check file type
-        const allowedTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/flac'];
-        const fileType = file.type;
+        // Enhanced file type checking
+        const allowedTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/wave', 'audio/x-wav', 'audio/ogg', 'audio/m4a', 'audio/mp4', 'audio/x-m4a', 'audio/flac', 'audio/x-flac', 'audio/aac', 'audio/wma'];
+        const allowedExtensions = /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i;
         
-        if (!allowedTypes.includes(fileType) && 
-            !file.name.match(/\.(mp3|wav|ogg|m4a|flac)$/i)) {
-            showError("Invalid file type. Please upload an audio file (MP3, WAV, OGG, M4A, FLAC).");
+        console.log('File type:', file.type);
+        console.log('File name:', file.name);
+        
+        // Check file extension (more reliable than MIME type)
+        if (!allowedExtensions.test(file.name)) {
+            showError("Invalid file type. Please upload an audio file (MP3, WAV, OGG, M4A, FLAC, AAC, WMA).");
             return;
         }
         
-        // Check file size (max 50MB)
-        if (file.size > 50 * 1024 * 1024) {
-            showError("File is too large. Maximum size is 50MB.");
+        // Check file size (max 200MB)
+        const maxSize = 200 * 1024 * 1024;
+        if (file.size > maxSize) {
+            showError("File is too large. Maximum size is 200MB.");
+            return;
+        }
+        
+        // Check if file is empty
+        if (file.size === 0) {
+            showError("File is empty. Please select a valid audio file.");
             return;
         }
         
