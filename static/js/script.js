@@ -261,15 +261,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Show progress with message
+        // Show progress
         progressContainer.classList.remove('d-none');
         progressBar.style.width = '0%';
-        
-        // Show processing notification
-        const processingMsg = document.createElement('div');
-        processingMsg.className = 'alert alert-info mt-2';
-        processingMsg.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Processing your audio file. This may take several minutes for large files...';
-        progressContainer.after(processingMsg);
         
         // Simulate progress for better UX during long operations
         let progress = 0;
@@ -319,7 +313,6 @@ document.addEventListener('DOMContentLoaded', function() {
         .finally(() => {
             clearInterval(progressInterval);
             progressContainer.classList.add('d-none');
-            processingMsg.remove();
         });
     }
     
