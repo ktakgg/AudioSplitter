@@ -236,13 +236,13 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         xhr.onerror = function() {
-            progressContainer.classList.add('d-none');
+            uploadProgressContainer.classList.add('d-none');
             showError("Network error occurred while uploading. Please check your connection and try again.");
             resetUploadState();
         };
         
         xhr.ontimeout = function() {
-            progressContainer.classList.add('d-none');
+            uploadProgressContainer.classList.add('d-none');
             showError("Upload timed out. Please try with a smaller file or check your connection.");
             resetUploadState();
         };
