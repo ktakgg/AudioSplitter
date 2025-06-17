@@ -2,11 +2,20 @@
 command = "gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app"
 
 [deployment]
-run = ["sh", "-c", "gunicorn --bind 0.0.0.0:5000 --reuse-port --workers 2 --timeout 300 --max-requests 1000 main:app"]
+run = ["./start.sh"]
 deploymentTarget = "cloudrun"
+
+[deployment.cloudRunOptions]
+memory = "2Gi"
+cpu = "2"
+maxScale = 10
+minScale = 1
+concurrency = 10
 
 [deployment.env]
 PYTHONPATH = "."
+GUNICORN_CMD_ARGS = "--timeout 600 --max-requests 1000 --limit-request-line 8190 --limit-request-field_size 8190"
+FLASK_MAX_CONTENT_LENGTH = "209715200"
 
 [nix]
 channel = "stable-24.05"

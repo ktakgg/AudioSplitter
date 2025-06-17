@@ -1,0 +1,20 @@
+# Replit Deployment Configuration
+# This file configures deployment-specific settings
+
+[deployment]
+# Increase request timeout for large file uploads
+request_timeout = 600
+
+# Increase max request size for file uploads
+max_request_size = "200MB"
+
+# Configure gunicorn for production
+gunicorn_workers = 2
+gunicorn_timeout = 600
+gunicorn_max_requests = 1000
+
+[environment]
+# Flask-specific configuration
+FLASK_MAX_CONTENT_LENGTH = "209715200"
+GUNICORN_TIMEOUT = "600"
+PYTHONPATH = "."
