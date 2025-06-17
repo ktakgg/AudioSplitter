@@ -145,6 +145,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const xhr = new XMLHttpRequest();
         
+        // Set timeout to 5 minutes for large files
+        xhr.timeout = 300000;
+        
         xhr.open('POST', '/upload', true);
         
         xhr.upload.onprogress = (e) => {
@@ -155,34 +158,50 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         xhr.onload = function() {
+            progressContainer.classList.add('d-none');
+            
             if (xhr.status === 200) {
-                const response = JSON.parse(xhr.responseText);
-                if (response.success) {
-                    progressBar.style.width = '100%';
-                    sessionId = response.session_id;
-                    
-                    // Show split options
-                    setTimeout(() => {
-                        splitOptions.classList.remove('d-none');
-                        progressContainer.classList.add('d-none');
-                    }, 500);
-                } else {
-                    showError(response.error || "Error uploading file");
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.success) {
+                        progressBar.style.width = '100%';
+                        sessionId = response.session_id;
+                        
+                        console.log('Upload successful:', response);
+                        
+                        // Show split options
+                        setTimeout(() => {
+                            splitOptions.classList.remove('d-none');
+                        }, 300);
+                    } else {
+                        showError(response.error || "Upload failed - please try again");
+                        resetUploadState();
+                    }
+                } catch (e) {
+                    console.error('Error parsing response:', e);
+                    showError("Invalid response from server");
                     resetUploadState();
                 }
             } else {
                 try {
                     const response = JSON.parse(xhr.responseText);
-                    showError(response.error || "Error uploading file");
+                    showError(response.error || `Upload failed (${xhr.status})`);
                 } catch (e) {
-                    showError("Error uploading file");
+                    showError(`Upload failed - server returned status ${xhr.status}`);
                 }
                 resetUploadState();
             }
         };
         
         xhr.onerror = function() {
-            showError("Network error occurred while uploading");
+            progressContainer.classList.add('d-none');
+            showError("Network error occurred while uploading. Please check your connection and try again.");
+            resetUploadState();
+        };
+        
+        xhr.ontimeout = function() {
+            progressContainer.classList.add('d-none');
+            showError("Upload timed out. Please try with a smaller file or check your connection.");
             resetUploadState();
         };
         
