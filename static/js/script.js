@@ -34,6 +34,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(config => {
             maxFileSize = config.max_file_size;
             maxFileSizeMB = config.max_file_size_mb;
+            console.log('Loaded server config:', config);
+            console.log('Updated maxFileSizeMB to:', maxFileSizeMB);
         })
         .catch(error => {
             console.warn('Failed to load server config, using defaults:', error);
