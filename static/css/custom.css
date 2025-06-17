@@ -50,6 +50,9 @@
     margin-bottom: 0 !important;
     font-size: 0.75rem !important;
     line-height: 1rem !important;
+    display: flex !important;
+    align-items: center !important;
+    overflow: hidden !important;
 }
 
 #upload-progress-container .progress-bar,
@@ -58,11 +61,14 @@
     border-radius: 0.5rem !important;
     transition: width 0.3s ease !important;
     background-image: none !important;
-    height: 1rem !important;
+    height: 100% !important;
     min-height: 1rem !important;
     max-height: 1rem !important;
     line-height: 1rem !important;
     font-size: 0.75rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 /* Force container dimensions to be identical */
