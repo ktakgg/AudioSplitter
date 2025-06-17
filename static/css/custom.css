@@ -39,28 +39,45 @@
     box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25);
 }
 
-/* Progress bar styling consistency */
+/* Progress bar styling consistency - Force unified appearance */
 #upload-progress-container .progress,
 #progress-container .progress {
-    height: 1rem;
-    border-radius: 0.5rem;
-    background-color: #e9ecef;
+    height: 1rem !important;
+    border-radius: 0.5rem !important;
+    background-color: #e9ecef !important;
+    margin-bottom: 0 !important;
 }
 
 #upload-progress-container .progress-bar,
 #progress-container .progress-bar {
-    background-color: #0d6efd;
-    border-radius: 0.5rem;
-    transition: width 0.3s ease;
+    background-color: #0d6efd !important;
+    border-radius: 0.5rem !important;
+    transition: width 0.3s ease !important;
+    background-image: none !important;
 }
 
+/* Ensure text styling is consistent */
 #upload-progress-container .text-center,
-#progress-container .text-center {
-    margin-top: 0.5rem;
+#progress-container .text-center,
+#progress-container #processing-message {
+    margin-top: 0.5rem !important;
+    margin-bottom: 0 !important;
 }
 
 #upload-progress-container small,
 #progress-container small {
-    color: #6c757d;
-    font-size: 0.875rem;
+    color: #6c757d !important;
+    font-size: 0.875rem !important;
+    font-weight: normal !important;
+}
+
+/* Remove any Bootstrap overrides that might cause differences */
+#upload-progress-container .progress-bar-striped,
+#progress-container .progress-bar-striped {
+    background-image: none !important;
+}
+
+#upload-progress-container .progress-bar-animated,
+#progress-container .progress-bar-animated {
+    animation: none !important;
 }
