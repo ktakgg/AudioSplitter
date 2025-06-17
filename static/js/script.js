@@ -309,9 +309,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const summaryDiv = document.createElement('div');
         summaryDiv.className = 'alert alert-success mb-3';
         summaryDiv.innerHTML = `
-            <h6><i class="fas fa-check-circle me-2"></i>Split Complete!</h6>
-            <p class="mb-1">Created ${data.segment_count} segments</p>
-            <p class="mb-0">Total output size: ${data.total_size_mb}MB</p>
+            <h6><i class="fas fa-check-circle me-2"></i>分割完了！</h6>
+            <p class="mb-1">${data.segment_count}個のセグメントを作成しました</p>
+            <p class="mb-0">合計出力サイズ: ${data.total_size_mb}MB</p>
         `;
         segmentsList.appendChild(summaryDiv);
         
