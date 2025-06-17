@@ -368,18 +368,89 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function downloadAllSegments() {
-        // Create a temporary link to trigger download
-        const link = document.createElement('a');
-        link.href = '/download-all';
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Show downloading status and disable buttons
+        const downloadAllBtn = document.getElementById('download-all');
+        const deleteFilesBtn = document.getElementById('delete-files-btn');
+        const manualCleanupBtn = document.getElementById('manual-cleanup-btn');
         
-        // Show deletion confirmation popup after a short delay
-        setTimeout(() => {
-            showDeleteConfirmation('download');
-        }, 1000);
+        // Disable all buttons during download
+        downloadAllBtn.disabled = true;
+        downloadAllBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>ダウンロード中...';
+        
+        if (deleteFilesBtn) deleteFilesBtn.disabled = true;
+        if (manualCleanupBtn) manualCleanupBtn.disabled = true;
+        
+        // Use fetch to monitor download progress
+        fetch('/download-all')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('ダウンロードに失敗しました');
+                }
+                
+                const contentLength = response.headers.get('content-length');
+                const total = parseInt(contentLength, 10);
+                let loaded = 0;
+                
+                const reader = response.body.getReader();
+                const chunks = [];
+                
+                function pump() {
+                    return reader.read().then(({ done, value }) => {
+                        if (done) {
+                            // Download completed
+                            const blob = new Blob(chunks);
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'audio_segments.zip';
+                            a.style.display = 'none';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                            
+                            // Re-enable buttons after download completes
+                            downloadAllBtn.disabled = false;
+                            downloadAllBtn.innerHTML = '<i class="fas fa-check me-2"></i>ダウンロード完了';
+                            
+                            if (deleteFilesBtn) deleteFilesBtn.disabled = false;
+                            if (manualCleanupBtn) manualCleanupBtn.disabled = false;
+                            
+                            // Wait a moment for the browser to process the download
+                            setTimeout(() => {
+                                // Show deletion confirmation popup after download completion
+                                showDeleteConfirmation('download');
+                            }, 1500);
+                            
+                            return;
+                        }
+                        
+                        chunks.push(value);
+                        loaded += value.length;
+                        
+                        if (total) {
+                            const progress = Math.round((loaded / total) * 100);
+                            downloadAllBtn.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i>ダウンロード中... ${progress}%`;
+                        }
+                        
+                        return pump();
+                    });
+                }
+                
+                return pump();
+            })
+            .catch(error => {
+                console.error('Download error:', error);
+                
+                // Re-enable buttons on error
+                downloadAllBtn.disabled = false;
+                downloadAllBtn.innerHTML = '<i class="fas fa-download me-2"></i>すべてのセグメントをZIPでダウンロード';
+                
+                if (deleteFilesBtn) deleteFilesBtn.disabled = false;
+                if (manualCleanupBtn) manualCleanupBtn.disabled = false;
+                
+                showError('ダウンロードに失敗しました: ' + error.message);
+            });
     }
     
     function showDeleteConfirmation() {
