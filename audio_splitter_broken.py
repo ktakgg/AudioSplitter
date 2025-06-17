@@ -79,19 +79,20 @@ def split_audio_file(input_file, output_dir, segment_size, split_type='seconds')
         # Make sure output directory exists
         os.makedirs(output_dir, exist_ok=True)
         
-        # Get the file format and size
+        # Get the file format
         file_format = get_audio_format(input_file)
-        file_size_mb = os.path.getsize(input_file) / (1024 * 1024)
         
         # Load the audio file with optimized parameters
         logger.info(f"Loading audio file: {input_file}")
         
         # Use streaming mode for large files to reduce memory usage
         try:
+            # For large files, use lower quality settings to speed up processing
             audio = AudioSegment.from_file(input_file, format=file_format)
             
-            # If file is very large (>50MB), reduce quality for faster processing
-            if file_size_mb > 50:
+            # If file is very large (>100MB), reduce quality for faster processing
+            file_size_mb = os.path.getsize(input_file) / (1024 * 1024)
+            if file_size_mb > 100:
                 logger.info(f"Large file detected ({file_size_mb:.1f}MB), using optimized processing")
                 # Convert to mono and lower sample rate for faster processing
                 if audio.channels > 1:
@@ -102,7 +103,8 @@ def split_audio_file(input_file, output_dir, segment_size, split_type='seconds')
             logger.warning(f"Failed to load with format {file_format}, trying automatic detection: {e}")
             audio = AudioSegment.from_file(input_file)
             # Apply same optimizations for auto-detected files
-            if file_size_mb > 50:
+            file_size_mb = os.path.getsize(input_file) / (1024 * 1024)
+            if file_size_mb > 100:
                 if audio.channels > 1:
                     audio = audio.set_channels(1)
                 if audio.frame_rate > 22050:
@@ -155,51 +157,74 @@ def split_audio_file(input_file, output_dir, segment_size, split_type='seconds')
                 # Extract segment efficiently
                 segment = audio[start_ms:end_ms]
                 
+                # For very large segments, apply compression to speed up processing
+                if len(segment) > 300000:  # 5 minutes
+                    if segment.channels > 1:
+                        segment = segment.set_channels(1)
+                    if segment.frame_rate > 22050:
+                        segment = segment.set_frame_rate(22050)
+                
                 # Generate output filename
                 output_filename = f"{base_name}_part{i+1:02d}.mp3"
                 output_path = os.path.join(output_dir, output_filename)
                 
-                # Export with fast, reliable settings
+                # Export with optimized settings for speed and reliability
                 export_success = False
                 
-                # Use optimized encoding based on file size
+                # Use faster encoding for large files
                 if file_size_mb > 50:
-                    # Fast encoding for large files
-                    try:
-                        segment.export(output_path, format="mp3", bitrate="96k")
-                        export_success = True
-                    except Exception:
-                        try:
-                            segment.export(output_path.replace('.mp3', '.wav'), format="wav")
-                            output_filename = output_filename.replace('.mp3', '.wav')
-                            export_success = True
-                        except Exception as e:
-                            logger.error(f"Failed to export segment {i+1}: {e}")
-                            continue
-                else:
-                    # Standard quality for smaller files
-                    try:
-                        segment.export(output_path, format="mp3", bitrate="128k")
-                        export_success = True
-                    except Exception:
-                        try:
-                            segment.export(output_path, format="mp3")
-                            export_success = True
-                        except Exception:
-                            try:
-                                segment.export(output_path.replace('.mp3', '.wav'), format="wav")
-                                output_filename = output_filename.replace('.mp3', '.wav')
-                                export_success = True
-                            except Exception as e:
-                                logger.error(f"Failed to export segment {i+1}: {e}")
-                                continue
-                
-                if export_success:
-                    output_files.append(output_filename)
-                
-            except Exception as e:
-                logger.error(f"Error processing segment {i+1}: {e}")
-                continue
+                    # Fast encoding settings for large files
+                    export_attempts = [
+                    # Attempt 1: Fast MP3 encoding
+                    lambda: segment.export(
+                        output_path, 
+                        format="mp3",
+                        bitrate="96k",
+                        parameters=[
+                            "-acodec", "libmp3lame",
+                            "-ac", "1",  # Force mono for speed
+                            "-ar", "22050",  # Lower sample rate
+                            "-compression_level", "1"  # Fast compression
+                        ]
+                    ),
+                    # Attempt 2: Very basic MP3
+                    lambda: segment.export(output_path, format="mp3", bitrate="96k"),
+                    # Attempt 3: WAV fallback (fastest)
+                    lambda: segment.export(output_path.replace('.mp3', '.wav'), format="wav")
+                ]
+            else:
+                # Standard quality for smaller files
+                export_attempts = [
+                    # Attempt 1: Standard MP3
+                    lambda: segment.export(
+                        output_path, 
+                        format="mp3",
+                        bitrate="128k",
+                        parameters=["-acodec", "libmp3lame", "-q:a", "4"]
+                    ),
+                    # Attempt 2: Basic MP3
+                    lambda: segment.export(output_path, format="mp3", bitrate="128k"),
+                    # Attempt 3: WAV fallback
+                    lambda: segment.export(output_path.replace('.mp3', '.wav'), format="wav")
+                ]
+            
+            for attempt_num, export_func in enumerate(export_attempts, 1):
+                try:
+                    export_func()
+                    export_success = True
+                    # Update filename if we used WAV fallback
+                    if attempt_num == 5:
+                        output_filename = output_filename.replace('.mp3', '.wav')
+                    break
+                except Exception as export_error:
+                    logger.warning(f"Export attempt {attempt_num} failed: {export_error}")
+                    if attempt_num == len(export_attempts):
+                        raise Exception(f"All export attempts failed. Last error: {export_error}")
+            
+            if not export_success:
+                raise Exception("Failed to export audio segment after all attempts")
+            
+            output_files.append(output_filename)
         
         logger.info(f"Successfully created {len(output_files)} segments")
         return output_files
