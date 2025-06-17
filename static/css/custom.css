@@ -38,3 +38,29 @@
 .form-control:focus, .form-select:focus, .btn:focus {
     box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25);
 }
+
+/* Progress bar styling consistency */
+#upload-progress-container .progress,
+#progress-container .progress {
+    height: 1rem;
+    border-radius: 0.5rem;
+    background-color: #e9ecef;
+}
+
+#upload-progress-container .progress-bar,
+#progress-container .progress-bar {
+    background-color: #0d6efd;
+    border-radius: 0.5rem;
+    transition: width 0.3s ease;
+}
+
+#upload-progress-container .text-center,
+#progress-container .text-center {
+    margin-top: 0.5rem;
+}
+
+#upload-progress-container small,
+#progress-container small {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
