@@ -1,6 +1,6 @@
-from app import db
+from database import db
 from datetime import datetime
-from sqlalchemy import func
+from sqlalchemy import func, CheckConstraint
 
 
 class FileUpload(db.Model):
