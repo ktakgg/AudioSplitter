@@ -377,6 +377,11 @@ def split_file():
         # Store output files in session
         session['output_files'] = output_files
         
+        # Get session ID
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({'error': 'Session ID not found'}), 400
+        
         # Create ZIP file immediately after splitting
         zip_filename = f"{session_id}_all_segments.zip"
         zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
