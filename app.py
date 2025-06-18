@@ -460,12 +460,18 @@ def split_file():
                 else:
                     logger.error(f"Output directory missing: {output_dir}")
         
-        # Update upload record with completion details
-        upload_record.segments_created = len(output_files)
-        upload_record.total_output_size = total_size
-        upload_record.processing_duration = processing_duration
-        upload_record.status = 'completed'
-        db.session.commit()
+        # Update upload record with completion details if available
+        if upload_record:
+            try:
+                upload_record.segments_created = len(output_files)
+                upload_record.total_output_size = total_size
+                upload_record.processing_duration = processing_duration
+                upload_record.status = 'completed'
+                db.session.commit()
+                logger.info(f"Updated upload record with completion details: {len(output_files)} segments")
+            except Exception as db_error:
+                logger.error(f"Database error updating completion details: {str(db_error)}")
+                # Continue without database update
         
         # Store output files in session
         session['output_files'] = output_files
