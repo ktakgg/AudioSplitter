@@ -227,15 +227,19 @@
                 <div id="results-section" class="mt-4 d-none">
                     <h5 class="mb-3"><span class="badge bg-primary me-2">3</span>分割したセグメントをダウンロード</h5>
                     <div class="d-grid gap-2 mb-3">
-                        <button id="download-all" class="btn btn-outline-primary">
+                        <a id="download-all" href="/download-all" class="btn btn-outline-primary">
                             <i class="fas fa-download me-2"></i>すべてのセグメントをZIPでダウンロード
-                        </button>
+                        </a>
                         <button id="delete-files-btn" class="btn btn-outline-danger">
-                            <i class="fas fa-trash me-2"></i>サーバー上のファイルを削除
+                            <i class="fas fa-trash me-2"></i>サーバー上のファイルを手動削除
                         </button>
                         <button id="manual-cleanup-btn" class="btn btn-outline-secondary">
                             <i class="fas fa-broom me-2"></i>セッションをクリーンアップ
                         </button>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <small>各セグメントファイルは下記のリンクから個別にダウンロードできます。ダウンロード完了後は、セキュリティのためサーバー上のファイルを手動削除することを推奨します。</small>
                     </div>
                     <div class="list-group" id="segments-list">
                         <!-- セグメントがここに表示されます -->
@@ -261,10 +265,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    // Pass server configuration to JavaScript
-    window.MAX_FILE_SIZE = {{ config.MAX_CONTENT_LENGTH }};
-    window.MAX_FILE_SIZE_MB = Math.floor({{ config.MAX_CONTENT_LENGTH }} / (1024 * 1024));
-</script>
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 {% endblock %}
