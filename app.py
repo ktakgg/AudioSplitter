@@ -689,15 +689,11 @@ def download_zip(zip_filename):
             logger.error(f"Verify traceback: {traceback.format_exc()}")
             return f"Error verifying ZIP file: {str(verify_error)}", 500
         
-        # Send the file
+        # Send the file - simplified approach matching the /download endpoint
         try:
             logger.info(f"Sending ZIP file: {zip_path} ({file_size} bytes)")
-            return send_file(
-                zip_path, 
-                as_attachment=True,
-                download_name=os.path.basename(zip_path),
-                mimetype='application/zip'
-            )
+            # Use the same simple send_file approach as the /download endpoint
+            return send_file(zip_path, as_attachment=True)
         except Exception as send_error:
             logger.error(f"Error sending ZIP file: {send_error}")
             import traceback
