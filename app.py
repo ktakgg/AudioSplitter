@@ -377,6 +377,25 @@ def split_file():
         # Store output files in session
         session['output_files'] = output_files
         
+        # Create ZIP file immediately after splitting
+        zip_filename = f"{session_id}_all_segments.zip"
+        zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
+        
+        try:
+            import zipfile
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for filename in output_files:
+                    file_path = os.path.join(output_dir, filename)
+                    if os.path.exists(file_path):
+                        zipf.write(file_path, filename)
+                        logger.info(f"Added to ZIP: {filename}")
+            
+            logger.info(f"Created ZIP file: {zip_path} ({os.path.getsize(zip_path)} bytes)")
+            session['zip_filename'] = zip_filename
+        except Exception as zip_error:
+            logger.error(f"Error creating ZIP file: {zip_error}")
+            # Continue without ZIP file - individual downloads will still work
+        
         total_size_mb = total_size / (1024 * 1024)
         
         logger.info(f"Successfully created {len(output_files)} segments, total size: {total_size_mb:.1f}MB, processing time: {processing_duration:.2f}s")
@@ -388,7 +407,8 @@ def split_file():
             'files': output_files,
             'total_size_mb': round(total_size_mb, 2),
             'segment_count': len(output_files),
-            'processing_time': round(processing_duration, 2)
+            'processing_time': round(processing_duration, 2),
+            'zip_filename': zip_filename
         })
     
     except Exception as e:
@@ -457,6 +477,26 @@ def download_file(filename):
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         return f"Error downloading file: {str(e)}", 500
+
+@app.route('/download-zip/<path:zip_filename>', methods=['GET'])
+def download_zip(zip_filename):
+    """Download pre-created ZIP file directly"""
+    try:
+        zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
+        
+        logger.info(f"ZIP download request: {zip_filename}")
+        logger.info(f"ZIP file path: {zip_path}")
+        logger.info(f"ZIP file exists: {os.path.exists(zip_path)}")
+        
+        if os.path.exists(zip_path):
+            return send_file(zip_path, as_attachment=True)
+        else:
+            logger.error(f"ZIP file not found: {zip_path}")
+            return "ZIP file not found", 404
+            
+    except Exception as e:
+        logger.error(f"Error downloading ZIP file: {e}")
+        return f"Error downloading ZIP file: {str(e)}", 500
 
 @app.route('/download-all', methods=['GET'])
 def download_all():

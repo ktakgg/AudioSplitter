@@ -455,6 +455,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear previous results
         segmentsList.innerHTML = '';
         
+        // Update download-all link with the ZIP filename
+        if (data.zip_filename) {
+            const downloadAllBtn = document.getElementById('download-all');
+            if (downloadAllBtn) {
+                downloadAllBtn.href = `/download-zip/${encodeURIComponent(data.zip_filename)}`;
+            }
+        }
+        
         // Add summary information
         const summaryDiv = document.createElement('div');
         summaryDiv.className = 'alert alert-success mb-3';
