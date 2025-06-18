@@ -495,9 +495,12 @@ def download_zip(zip_filename):
         
         if os.path.exists(zip_path):
             try:
+                logger.info(f"Attempting to send file: {zip_path}")
                 return send_file(zip_path, as_attachment=True)
             except Exception as send_error:
                 logger.error(f"Error sending ZIP file: {send_error}")
+                import traceback
+                logger.error(f"Send file traceback: {traceback.format_exc()}")
                 return f"Error sending ZIP file: {str(send_error)}", 500
         else:
             logger.error(f"ZIP file not found: {zip_path}")
@@ -509,7 +512,7 @@ def download_zip(zip_filename):
     except Exception as e:
         logger.error(f"Error downloading ZIP file: {e}")
         import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"General download traceback: {traceback.format_exc()}")
         return f"Error downloading ZIP file: {str(e)}", 500
 
 @app.route('/download-all', methods=['GET'])
