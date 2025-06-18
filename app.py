@@ -336,11 +336,24 @@ def split_file():
         
         # Calculate total output size and create segment records
         total_size = 0
+        logger.info(f"Processing {len(output_files)} output files:")
         for i, filename in enumerate(output_files):
             file_path = os.path.join(output_dir, filename)
+            logger.info(f"Checking file {i+1}: {file_path}")
+            logger.info(f"File exists: {os.path.exists(file_path)}")
+            
             if os.path.exists(file_path):
                 file_size = os.path.getsize(file_path)
                 total_size += file_size
+                logger.info(f"File size: {file_size} bytes")
+                
+                # Verify file is readable
+                try:
+                    with open(file_path, 'rb') as test_file:
+                        test_file.read(1024)  # Test read first 1KB
+                    logger.info(f"File is readable: {filename}")
+                except Exception as e:
+                    logger.error(f"File read error for {filename}: {e}")
                 
                 # Create segment record in database
                 segment_record = AudioSegment()
@@ -352,6 +365,14 @@ def split_file():
                 segment_record.start_time_ms = 0  # Will be calculated later if needed
                 segment_record.end_time_ms = 0   # Will be calculated later if needed
                 db.session.add(segment_record)
+            else:
+                logger.error(f"Output file missing: {file_path}")
+                # Check if file exists in directory listing
+                if os.path.exists(output_dir):
+                    dir_contents = os.listdir(output_dir)
+                    logger.info(f"Directory contents: {dir_contents}")
+                else:
+                    logger.error(f"Output directory missing: {output_dir}")
         
         # Update upload record with completion details
         upload_record.segments_created = len(output_files)
