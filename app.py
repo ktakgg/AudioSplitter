@@ -505,10 +505,8 @@ def split_file():
                     with open(zip_path, 'rb') as test_file:
                         header = test_file.read(4)
                         if len(header) >= 4 and header[:4] == b'PK\x03\x04':  # ZIP file signature
-                            # ZIP file is valid - create direct download URL
-                            from flask import url_for
-                            zip_download_url = url_for('download_zip', zip_filename=zip_filename, _external=True)
-                            logger.info(f"ZIP download URL: {zip_download_url}")
+                            # ZIP file is valid
+                            logger.info(f"ZIP file is valid and ready for download")
                             session['zip_filename'] = zip_filename
                         else:
                             logger.error(f"Created file is not a valid ZIP: {zip_path}")
@@ -605,106 +603,32 @@ def download_file(filename):
         logger.error(f"Traceback: {traceback.format_exc()}")
         return f"Error downloading file: {str(e)}", 500
 
-@app.route('/download-zip/<path:zip_filename>', methods=['GET'])
-def download_zip(zip_filename):
-    """Download pre-created ZIP file directly"""
+@app.route('/download-all-zip', methods=['GET'])
+def download_all_zip():
+    """Simple ZIP download endpoint"""
     try:
-        # Log the raw zip_filename for debugging
-        logger.info(f"Raw ZIP filename from URL: {zip_filename}")
+        # Get session ID from current session
+        session_id = session.get('session_id')
+        if not session_id:
+            logger.error("No session ID found")
+            return "Session not found", 400
         
-        # Decode URL-encoded filename if needed
-        try:
-            from urllib.parse import unquote
-            decoded_filename = unquote(zip_filename)
-            if decoded_filename != zip_filename:
-                logger.info(f"Decoded ZIP filename: {decoded_filename}")
-                zip_filename = decoded_filename
-        except Exception as decode_error:
-            logger.error(f"Error decoding filename: {decode_error}")
-            # Continue with original filename
-        
-        # Sanitize filename for security
-        from werkzeug.utils import secure_filename
-        secure_zip_filename = secure_filename(zip_filename)
-        if secure_zip_filename != zip_filename:
-            logger.info(f"Sanitized ZIP filename: {secure_zip_filename}")
-            zip_filename = secure_zip_filename
-        
-        # Construct full path
+        # Look for ZIP file in splits directory
+        zip_filename = f"{session_id}_all_segments.zip"
         zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
         
-        logger.info(f"ZIP download request: {zip_filename}")
-        logger.info(f"ZIP file path: {zip_path}")
-        logger.info(f"ZIP file exists: {os.path.exists(zip_path)}")
+        logger.info(f"Looking for ZIP file: {zip_path}")
         
-        # Check if file exists
         if not os.path.exists(zip_path):
             logger.error(f"ZIP file not found: {zip_path}")
-            
-            # Try to find the file by session ID
-            if '_all_segments.zip' in zip_filename:
-                session_id = zip_filename.split('_all_segments.zip')[0]
-                logger.info(f"Extracted session ID: {session_id}")
-                
-                # Check if session ID is valid
-                if session_id and len(session_id) > 10:  # Basic validation
-                    # Look for any ZIP file with this session ID
-                    alternative_path = None
-                    for file in os.listdir(OUTPUT_FOLDER):
-                        if file.startswith(session_id) and file.endswith('.zip'):
-                            alternative_path = os.path.join(OUTPUT_FOLDER, file)
-                            logger.info(f"Found alternative ZIP file: {file}")
-                            break
-                    
-                    if alternative_path and os.path.exists(alternative_path):
-                        logger.info(f"Using alternative ZIP file: {alternative_path}")
-                        zip_path = alternative_path
-                    else:
-                        logger.error(f"No alternative ZIP file found for session: {session_id}")
-                        return "ZIP file not found", 404
-                else:
-                    logger.error(f"Invalid session ID extracted: {session_id}")
-                    return "Invalid ZIP filename", 400
-            else:
-                return "ZIP file not found", 404
+            return "ZIP file not found", 404
         
-        # Verify file is readable and not empty
-        try:
-            file_size = os.path.getsize(zip_path)
-            logger.info(f"ZIP file size: {file_size} bytes")
-            
-            if file_size == 0:
-                logger.error(f"ZIP file is empty: {zip_path}")
-                return "ZIP file is empty", 500
-            
-            # Test read the first few bytes
-            with open(zip_path, 'rb') as test_file:
-                header = test_file.read(4)
-                if len(header) < 4 or header[:4] != b'PK\x03\x04':  # ZIP file signature
-                    logger.error(f"File is not a valid ZIP: {zip_path}")
-                    return "Invalid ZIP file", 500
-        except Exception as verify_error:
-            logger.error(f"Error verifying ZIP file: {verify_error}")
-            import traceback
-            logger.error(f"Verify traceback: {traceback.format_exc()}")
-            return f"Error verifying ZIP file: {str(verify_error)}", 500
+        logger.info(f"Sending ZIP file: {zip_path}")
+        return send_file(zip_path, as_attachment=True, download_name=zip_filename)
         
-        # Send the file - simplified approach matching the /download endpoint
-        try:
-            logger.info(f"Sending ZIP file: {zip_path} ({file_size} bytes)")
-            # Use the same simple send_file approach as the /download endpoint
-            return send_file(zip_path, as_attachment=True)
-        except Exception as send_error:
-            logger.error(f"Error sending ZIP file: {send_error}")
-            import traceback
-            logger.error(f"Send file traceback: {traceback.format_exc()}")
-            return f"Error sending ZIP file: {str(send_error)}", 500
-    
     except Exception as e:
-        logger.error(f"Error in download_zip: {e}")
-        import traceback
-        logger.error(f"General download traceback: {traceback.format_exc()}")
-        return f"Error downloading ZIP file: {str(e)}", 500
+        logger.error(f"Error downloading ZIP: {str(e)}")
+        return f"Error: {str(e)}", 500
 
 @app.route('/cleanup', methods=['POST'])
 def cleanup():

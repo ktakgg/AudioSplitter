@@ -455,14 +455,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear previous results
         segmentsList.innerHTML = '';
         
-    // Update download-all link with the ZIP filename
+    // Update download-all link to use the new simple endpoint
     if (data.zip_filename) {
         const downloadAllBtn = document.getElementById('download-all');
         if (downloadAllBtn) {
-            // Set direct download URL
-            downloadAllBtn.href = `/download-zip/${encodeURIComponent(data.zip_filename)}`;
+            // Use the new simple ZIP download endpoint
+            downloadAllBtn.href = '/download-all-zip';
             downloadAllBtn.removeAttribute('onclick'); // Remove any previous click handlers
-            console.log('Set ZIP download URL:', downloadAllBtn.href);
+            console.log('Set ZIP download URL to simple endpoint');
         }
     } else {
         // If no ZIP filename is provided, hide the download all button
