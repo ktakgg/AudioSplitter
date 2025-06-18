@@ -116,52 +116,121 @@ def upload_chunk():
         session_upload_dir = os.path.join(UPLOAD_FOLDER, session_id)
         os.makedirs(session_upload_dir, exist_ok=True)
         
-        # Save chunk
-        secure_name = secure_filename(filename)
-        chunk_path = os.path.join(session_upload_dir, f"{secure_name}.part{chunk_number}")
-        chunk.save(chunk_path)
+        # Save chunk with error handling
+        try:
+            secure_name = secure_filename(filename)
+            chunk_path = os.path.join(session_upload_dir, f"{secure_name}.part{chunk_number}")
+            chunk.save(chunk_path)
+            logger.info(f"Saved chunk {chunk_number} of {total_chunks} to {chunk_path}")
+        except Exception as chunk_error:
+            logger.error(f"Error saving chunk {chunk_number}: {str(chunk_error)}")
+            logger.error(f"Exception type: {type(chunk_error).__name__}")
+            import traceback
+            logger.error(f"Chunk save traceback: {traceback.format_exc()}")
+            return jsonify({'error': f'Error saving chunk: {str(chunk_error)}'}), 500
         
         # Check if all chunks are uploaded
-        chunks_received = len([f for f in os.listdir(session_upload_dir) if f.startswith(f"{secure_name}.part")])
+        try:
+            chunks_received = len([f for f in os.listdir(session_upload_dir) if f.startswith(f"{secure_name}.part")])
+            logger.info(f"Chunks received: {chunks_received} of {total_chunks}")
+        except Exception as list_error:
+            logger.error(f"Error listing chunks: {str(list_error)}")
+            return jsonify({'error': f'Error checking chunks: {str(list_error)}'}), 500
         
         if chunks_received == total_chunks:
-            # Assemble the complete file
-            final_path = os.path.join(session_upload_dir, secure_name)
-            with open(final_path, 'wb') as final_file:
-                for i in range(total_chunks):
-                    chunk_file = os.path.join(session_upload_dir, f"{secure_name}.part{i}")
-                    with open(chunk_file, 'rb') as part:
-                        final_file.write(part.read())
-                    os.remove(chunk_file)  # Clean up chunk
+            # Assemble the complete file with error handling
+            try:
+                final_path = os.path.join(session_upload_dir, secure_name)
+                logger.info(f"Assembling complete file to {final_path}")
+                
+                with open(final_path, 'wb') as final_file:
+                    for i in range(total_chunks):
+                        chunk_file = os.path.join(session_upload_dir, f"{secure_name}.part{i}")
+                        if os.path.exists(chunk_file):
+                            with open(chunk_file, 'rb') as part:
+                                final_file.write(part.read())
+                            try:
+                                os.remove(chunk_file)  # Clean up chunk
+                            except Exception as remove_error:
+                                logger.error(f"Error removing chunk {i}: {str(remove_error)}")
+                                # Continue even if cleanup fails
+                        else:
+                            logger.error(f"Chunk file missing: {chunk_file}")
+                            return jsonify({'error': f'Chunk file missing: part{i}'}), 500
+                
+                logger.info(f"Successfully assembled file: {final_path}")
+                
+                # Verify file was created
+                if not os.path.exists(final_path):
+                    logger.error(f"Final file was not created: {final_path}")
+                    return jsonify({'error': 'Failed to create final file'}), 500
+                
+                file_size_actual = os.path.getsize(final_path)
+                logger.info(f"Final file size: {file_size_actual} bytes (expected: {file_size} bytes)")
+                
+                # Check if file size is reasonable
+                if file_size_actual == 0:
+                    logger.error(f"Final file is empty: {final_path}")
+                    return jsonify({'error': 'Final file is empty'}), 500
+            except Exception as assemble_error:
+                logger.error(f"Error assembling file: {str(assemble_error)}")
+                logger.error(f"Exception type: {type(assemble_error).__name__}")
+                import traceback
+                logger.error(f"File assembly traceback: {traceback.format_exc()}")
+                return jsonify({'error': f'Error assembling file: {str(assemble_error)}'}), 500
             
-            # Create database record
-            from models import FileUpload
-            file_format = secure_name.rsplit('.', 1)[1].lower() if '.' in secure_name else 'unknown'
+            # Create database record - with additional error handling
+            try:
+                from models import FileUpload
+                file_format = secure_name.rsplit('.', 1)[1].lower() if '.' in secure_name else 'unknown'
+                
+                upload_record = FileUpload()
+                upload_record.session_id = session_id
+                upload_record.original_filename = secure_name
+                upload_record.file_size = file_size
+                upload_record.file_format = file_format
+                upload_record.status = 'uploaded'
+                db.session.add(upload_record)
+                db.session.commit()
+                
+                # Store session data
+                session['upload_id'] = upload_record.id
+                session['original_filename'] = secure_name
+                session['filepath'] = final_path
+                session['output_dir'] = os.path.join(OUTPUT_FOLDER, session_id)
+                os.makedirs(session['output_dir'], exist_ok=True)
+            except Exception as db_error:
+                logger.error(f"Database error during chunk upload: {str(db_error)}")
+                logger.error(f"Exception type: {type(db_error).__name__}")
+                import traceback
+                logger.error(f"Database error traceback: {traceback.format_exc()}")
+                
+                # Continue without database record - at least save the file
+                session['original_filename'] = secure_name
+                session['filepath'] = final_path
+                session['output_dir'] = os.path.join(OUTPUT_FOLDER, session_id)
+                os.makedirs(session['output_dir'], exist_ok=True)
             
-            upload_record = FileUpload()
-            upload_record.session_id = session_id
-            upload_record.original_filename = secure_name
-            upload_record.file_size = file_size
-            upload_record.file_format = file_format
-            upload_record.status = 'uploaded'
-            db.session.add(upload_record)
-            db.session.commit()
-            
-            # Store session data
-            session['upload_id'] = upload_record.id
-            session['original_filename'] = secure_name
-            session['filepath'] = final_path
-            session['output_dir'] = os.path.join(OUTPUT_FOLDER, session_id)
-            os.makedirs(session['output_dir'], exist_ok=True)
-            
-            return jsonify({
+            # Prepare response - handle case where upload_record might not exist
+            response_data = {
                 'success': True,
                 'complete': True,
                 'filename': secure_name,
                 'session_id': session_id,
-                'file_size': file_size,
-                'upload_id': upload_record.id
-            })
+                'file_size': file_size
+            }
+            
+            # Add upload_id if available
+            try:
+                if 'upload_id' in session:
+                    response_data['upload_id'] = session['upload_id']
+                elif 'upload_record' in locals() and upload_record and hasattr(upload_record, 'id'):
+                    response_data['upload_id'] = upload_record.id
+            except Exception as id_error:
+                logger.error(f"Error getting upload_id: {str(id_error)}")
+                # Continue without upload_id
+            
+            return jsonify(response_data)
         else:
             return jsonify({
                 'success': True,
