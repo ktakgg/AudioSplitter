@@ -172,6 +172,9 @@ def upload_chunk():
             
     except Exception as e:
         logger.error(f"Error during chunk upload: {str(e)}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Chunk upload traceback: {traceback.format_exc()}")
         return jsonify({'error': f'Chunk upload failed: {str(e)}'}), 500
 
 @app.route('/upload', methods=['POST'])
