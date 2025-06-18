@@ -455,28 +455,21 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear previous results
         segmentsList.innerHTML = '';
         
-    // Store ZIP filename in a data attribute instead of directly in href
+    // Update download-all link with the ZIP filename
     if (data.zip_filename) {
         const downloadAllBtn = document.getElementById('download-all');
         if (downloadAllBtn) {
-            // Store the original filename in a data attribute
-            downloadAllBtn.setAttribute('data-zip-filename', data.zip_filename);
-            
-            // Set href to a stable URL that won't change on hover
-            downloadAllBtn.href = '#download-all-zip';
-            
-            // Add click handler to handle the download
-            downloadAllBtn.onclick = function(e) {
-                e.preventDefault();
-                const zipFilename = this.getAttribute('data-zip-filename');
-                if (zipFilename) {
-                    // Navigate to the download URL
-                    window.location.href = `/download-zip/${encodeURIComponent(zipFilename)}`;
-                }
-                return false;
-            };
-            
-            console.log('Set ZIP download handler for:', data.zip_filename);
+            // Set direct download URL
+            downloadAllBtn.href = `/download-zip/${encodeURIComponent(data.zip_filename)}`;
+            downloadAllBtn.removeAttribute('onclick'); // Remove any previous click handlers
+            console.log('Set ZIP download URL:', downloadAllBtn.href);
+        }
+    } else {
+        // If no ZIP filename is provided, hide the download all button
+        const downloadAllBtn = document.getElementById('download-all');
+        if (downloadAllBtn) {
+            downloadAllBtn.style.display = 'none';
+            console.log('ZIP file not available, hiding download all button');
         }
     }
         

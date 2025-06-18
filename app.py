@@ -481,9 +481,10 @@ def split_file():
         if not session_id:
             return jsonify({'error': 'Session ID not found'}), 400
         
-        # Create ZIP file immediately after splitting
+        # Create ZIP file immediately after splitting with enhanced verification
         zip_filename = f"{session_id}_all_segments.zip"
         zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
+        zip_download_url = None
         
         try:
             import zipfile
@@ -494,10 +495,32 @@ def split_file():
                         zipf.write(file_path, filename)
                         logger.info(f"Added to ZIP: {filename}")
             
-            logger.info(f"Created ZIP file: {zip_path} ({os.path.getsize(zip_path)} bytes)")
-            session['zip_filename'] = zip_filename
+            # Verify ZIP file was created successfully
+            if os.path.exists(zip_path):
+                file_size = os.path.getsize(zip_path)
+                logger.info(f"Created ZIP file: {zip_path} ({file_size} bytes)")
+                
+                if file_size > 0:
+                    # Test read the first few bytes to verify it's a valid ZIP
+                    with open(zip_path, 'rb') as test_file:
+                        header = test_file.read(4)
+                        if len(header) >= 4 and header[:4] == b'PK\x03\x04':  # ZIP file signature
+                            # ZIP file is valid - create direct download URL
+                            from flask import url_for
+                            zip_download_url = url_for('download_zip', zip_filename=zip_filename, _external=True)
+                            logger.info(f"ZIP download URL: {zip_download_url}")
+                            session['zip_filename'] = zip_filename
+                        else:
+                            logger.error(f"Created file is not a valid ZIP: {zip_path}")
+                else:
+                    logger.error(f"Created ZIP file is empty: {zip_path}")
+            else:
+                logger.error(f"ZIP file was not created: {zip_path}")
+                
         except Exception as zip_error:
             logger.error(f"Error creating ZIP file: {zip_error}")
+            import traceback
+            logger.error(f"ZIP creation traceback: {traceback.format_exc()}")
             # Continue without ZIP file - individual downloads will still work
         
         total_size_mb = total_size / (1024 * 1024)
