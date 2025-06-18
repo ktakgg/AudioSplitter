@@ -1,7 +1,7 @@
 [project]
 name = "repl-nix-workspace"
 version = "0.1.0"
-description = "Add your description here"
+description = "Audio Splitter Web Application with Enhanced Security"
 requires-python = ">=3.11"
 dependencies = [
     "email-validator>=2.2.0",
@@ -11,4 +11,5 @@ dependencies = [
     "gunicorn>=23.0.0",
     "psycopg2-binary>=2.9.10",
     "pydub>=0.25.1",
+    "python-magic>=0.4.27",
 ]

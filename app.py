@@ -2,30 +2,26 @@ import os
 import logging
 import uuid
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, send_from_directory, url_for, flash, redirect, session, send_file
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
 from werkzeug.utils import secure_filename
 from werkzeug.middleware.proxy_fix import ProxyFix
 import tempfile
 import shutil
 from audio_splitter import split_audio_file
 
+# Import improved modules
+from database import db
+from security import validate_audio_file, generate_secure_session_id, validate_segment_parameters
+
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Database base class
-class Base(DeclarativeBase):
-    pass
-
-# Create SQLAlchemy instance
-db = SQLAlchemy(model_class=Base)
-
 # Create app
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev_secret_key")
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # セッション有効期限30分
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Database configuration
@@ -111,9 +107,10 @@ def upload_chunk():
         if not allowed_file(filename):
             return jsonify({'error': f'Unsupported file format. Allowed formats: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
         
-        # Get or create session ID
-        session_id = session.get('session_id') or str(uuid.uuid4())
+        # Get or create session ID using secure generation
+        session_id = session.get('session_id') or generate_secure_session_id()
         session['session_id'] = session_id
+        session.permanent = True
         
         # Create directories
         session_upload_dir = os.path.join(UPLOAD_FOLDER, session_id)
@@ -192,9 +189,10 @@ def upload_file():
     
     session_id = None
     try:
-        # Create unique session ID for this upload
-        session_id = str(uuid.uuid4())
+        # Create unique session ID for this upload using secure generation
+        session_id = generate_secure_session_id()
         session['session_id'] = session_id
+        session.permanent = True
         
         # Create session directory
         session_upload_dir = os.path.join(UPLOAD_FOLDER, session_id)
@@ -270,15 +268,10 @@ def split_file():
         segment_size = request.form.get('segment_size', type=int)
         split_type = request.form.get('split_type', 'seconds')
         
-        # Enhanced validation
-        if not segment_size or segment_size <= 0:
-            return jsonify({'error': 'Invalid segment size'}), 400
-        
-        if split_type == 'megabytes' and segment_size > 50:
-            return jsonify({'error': 'Segment size too large. Maximum 50MB per segment.'}), 400
-        
-        if split_type == 'seconds' and segment_size > 3600:
-            return jsonify({'error': 'Segment size too large. Maximum 1 hour per segment.'}), 400
+        # Enhanced validation using security module
+        is_valid, validation_error = validate_segment_parameters(segment_size, split_type)
+        if not is_valid:
+            return jsonify({'error': validation_error}), 400
         
         # Get upload record and update status
         from models import FileUpload, AudioSegment

@@ -1,9 +1,15 @@
 import os
-import magic
 import hashlib
 import secrets
 from werkzeug.utils import secure_filename
 from typing import Optional, Tuple
+
+# python-magicが利用できない場合のフォールバック
+try:
+    import magic
+    HAS_MAGIC = True
+except ImportError:
+    HAS_MAGIC = False
 
 # 許可されたファイル形式とMIMEタイプのマッピング
 ALLOWED_AUDIO_FORMATS = {
@@ -40,16 +46,17 @@ def validate_audio_file(file_path: str, original_filename: str) -> Tuple[bool, O
         if os.path.getsize(file_path) == 0:
             return False, "ファイルが空です"
         
-        # MIMEタイプ検証
-        try:
-            mime_type = magic.from_file(file_path, mime=True)
-            allowed_mimes = ALLOWED_AUDIO_FORMATS[extension]
-            
-            if mime_type not in allowed_mimes:
-                return False, f"ファイル内容が拡張子と一致しません。検出されたタイプ: {mime_type}"
-        except Exception as e:
-            # python-magicが利用できない場合はスキップ
-            pass
+        # MIMEタイプ検証（python-magicが利用可能な場合のみ）
+        if HAS_MAGIC:
+            try:
+                mime_type = magic.from_file(file_path, mime=True)
+                allowed_mimes = ALLOWED_AUDIO_FORMATS[extension]
+                
+                if mime_type not in allowed_mimes:
+                    return False, f"ファイル内容が拡張子と一致しません。検出されたタイプ: {mime_type}"
+            except Exception as e:
+                # MIMEタイプ検証に失敗した場合はスキップ
+                pass
         
         # ファイル名の安全性チェック
         safe_filename = secure_filename(original_filename)
