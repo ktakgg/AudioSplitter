@@ -3,7 +3,7 @@ import logging
 import uuid
 import time
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_from_directory, url_for, flash, redirect, session
+from flask import Flask, render_template, request, jsonify, send_from_directory, url_for, flash, redirect, session, send_file
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.utils import secure_filename
@@ -440,10 +440,6 @@ def download_file(filename):
     
     except Exception as e:
         logger.error(f"Download error: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return f"Error downloading file: {str(e)}", 500
-        logger.error(f"Error during file download: {str(e)}")
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         return f"Error downloading file: {str(e)}", 500
