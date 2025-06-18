@@ -40,10 +40,14 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Configuration
-UPLOAD_FOLDER = os.path.join(tempfile.gettempdir(), 'audio_uploads')
-OUTPUT_FOLDER = os.path.join(tempfile.gettempdir(), 'audio_splits')
+# Configuration - Use persistent storage instead of temp directories
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
+OUTPUT_FOLDER = os.path.join(os.getcwd(), 'splits')
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma'}
+
+# Ensure directories exist
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 # Get max content length from environment or default to 200MB
 # Use consistent 200MB limit for both development and deployment
@@ -395,46 +399,50 @@ def split_file():
 
 @app.route('/download/<path:filename>', methods=['GET'])
 def download_file(filename):
-    if 'output_dir' not in session:
-        logger.error("Download failed: No output_dir in session")
-        return "No files available for download", 400
-    
     try:
-        output_dir = session['output_dir']
-        file_path = os.path.join(output_dir, filename)
+        from models import AudioSegment, FileUpload
         
-        logger.info(f"Download request: {filename}")
-        logger.info(f"Output directory: {output_dir}")
-        logger.info(f"File path: {file_path}")
-        logger.info(f"Directory exists: {os.path.exists(output_dir)}")
-        logger.info(f"File exists: {os.path.exists(file_path)}")
+        # First try to find the file in database records
+        segment = AudioSegment.query.filter_by(filename=filename).order_by(AudioSegment.created_timestamp.desc()).first()
         
-        if os.path.exists(output_dir):
-            files_in_dir = os.listdir(output_dir)
-            logger.info(f"Files in directory: {files_in_dir}")
+        if segment:
+            # Get the upload record to find session_id
+            upload = FileUpload.query.get(segment.upload_id)
+            if upload:
+                output_dir = os.path.join(OUTPUT_FOLDER, upload.session_id)
+                file_path = os.path.join(output_dir, filename)
+                
+                logger.info(f"Download request from DB: {filename}")
+                logger.info(f"Session ID: {upload.session_id}")
+                logger.info(f"Output directory: {output_dir}")
+                logger.info(f"File path: {file_path}")
+                
+                if os.path.exists(file_path):
+                    # Update download count
+                    segment.download_count += 1
+                    db.session.commit()
+                    
+                    return send_file(file_path, as_attachment=True)
         
-        if not os.path.exists(file_path):
-            logger.error(f"File not found: {file_path}")
-            return f"File not found: {filename}", 404
+        # Fallback: try session-based approach
+        if 'output_dir' in session:
+            output_dir = session['output_dir']
+            file_path = os.path.join(output_dir, filename)
+            
+            logger.info(f"Download fallback from session: {filename}")
+            logger.info(f"Output directory: {output_dir}")
+            
+            if os.path.exists(file_path):
+                return send_file(file_path, as_attachment=True)
         
-        # Track download in database
-        upload_id = session.get('upload_id')
-        if upload_id:
-            from models import AudioSegment
-            segment = AudioSegment.query.filter_by(
-                upload_id=upload_id, 
-                filename=filename
-            ).first()
-            if segment:
-                segment.download_count += 1
-                db.session.commit()
-        
-        return send_from_directory(
-            output_dir,
-            filename,
-            as_attachment=True
-        )
+        logger.error(f"File not found anywhere: {filename}")
+        return f"File not found: {filename}", 404
+    
     except Exception as e:
+        logger.error(f"Download error: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return f"Error downloading file: {str(e)}", 500
         logger.error(f"Error during file download: {str(e)}")
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
