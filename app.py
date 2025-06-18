@@ -332,8 +332,14 @@ def upload_file():
 
 @app.route('/split', methods=['POST'])
 def split_file():
-    if 'filepath' not in session or 'output_dir' not in session or 'upload_id' not in session:
+    if 'filepath' not in session or 'output_dir' not in session:
         return jsonify({'error': 'No file uploaded'}), 400
+    
+    # Log session data for debugging
+    logger.info(f"Split request - session keys: {list(session.keys())}")
+    logger.info(f"filepath: {session.get('filepath')}")
+    logger.info(f"output_dir: {session.get('output_dir')}")
+    logger.info(f"upload_id: {session.get('upload_id')}")
     
     try:
         # Get parameters from the form
@@ -345,19 +351,27 @@ def split_file():
         if not is_valid:
             return jsonify({'error': validation_error}), 400
         
-        # Get upload record and update status
+        # Get upload record and update status if available
         from models import FileUpload, AudioSegment
-        upload_id = session['upload_id']
-        upload_record = FileUpload.query.get(upload_id)
-        if not upload_record:
-            return jsonify({'error': 'Upload record not found'}), 400
+        upload_id = session.get('upload_id')
+        upload_record = None
         
-        # Update processing parameters
-        upload_record.segment_size = segment_size
-        upload_record.split_type = split_type
-        upload_record.status = 'processing'
-        upload_record.processing_timestamp = datetime.utcnow()
-        db.session.commit()
+        if upload_id:
+            try:
+                upload_record = FileUpload.query.get(upload_id)
+                if upload_record:
+                    # Update processing parameters
+                    upload_record.segment_size = segment_size
+                    upload_record.split_type = split_type
+                    upload_record.status = 'processing'
+                    upload_record.processing_timestamp = datetime.utcnow()
+                    db.session.commit()
+                    logger.info(f"Updated upload record {upload_id} with processing parameters")
+                else:
+                    logger.warning(f"Upload record not found for ID: {upload_id}")
+            except Exception as db_error:
+                logger.error(f"Database error updating upload record: {str(db_error)}")
+                # Continue without database record
         
         # Process the audio file
         filepath = session['filepath']
@@ -394,9 +408,16 @@ def split_file():
         processing_duration = time.time() - start_time
         
         if not output_files:
-            upload_record.status = 'error'
-            upload_record.error_message = 'No segments were created. File may be too short.'
-            db.session.commit()
+            # Update upload record if available
+            if upload_record:
+                try:
+                    upload_record.status = 'error'
+                    upload_record.error_message = 'No segments were created. File may be too short.'
+                    db.session.commit()
+                except Exception as db_error:
+                    logger.error(f"Database error updating upload record status: {str(db_error)}")
+                    # Continue without database update
+            
             return jsonify({'error': 'No segments were created. File may be too short.'}), 400
         
         # Calculate total output size and create segment records
