@@ -7,7 +7,7 @@ class FileUpload(db.Model):
     __tablename__ = 'file_uploads'
     
     id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(36), nullable=False, index=True)
+    session_id = db.Column(db.String(64), nullable=False, index=True)
     original_filename = db.Column(db.String(255), nullable=False)
     file_size = db.Column(db.BigInteger, nullable=False)
     file_format = db.Column(db.String(10), nullable=False)
