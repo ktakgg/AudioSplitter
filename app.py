@@ -554,6 +554,13 @@ def split_file():
         return jsonify(response_data)
     
     except Exception as e:
+        # 【最重要】エラーの詳細をコンソールに強制出力
+        print(f"!!! SPLIT PROCESSING ERROR OCCURRED: {e}")
+        print(f"!!! ERROR TYPE: {type(e).__name__}")
+        import traceback
+        print("!!! FULL TRACEBACK:")
+        traceback.print_exc()
+        
         # Update upload record with error
         try:
             from models import FileUpload
@@ -564,14 +571,24 @@ def split_file():
                     upload_record.status = 'error'
                     upload_record.error_message = str(e)
                     db.session.commit()
-        except:
-            pass
+        except Exception as db_error:
+            print(f"!!! DATABASE UPDATE ERROR: {db_error}")
+            traceback.print_exc()
         
         logger.error(f"Error during file splitting: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        
         error_msg = str(e)
         if "timeout" in error_msg.lower() or "worker timeout" in error_msg.lower():
             error_msg = "File processing took too long. Try splitting into smaller segments or use a smaller file."
-        return jsonify({'error': f'Processing failed: {error_msg}'}), 500
+        
+        # より詳細なエラーメッセージを返す
+        return jsonify({
+            'error': f'Processing failed: {error_msg}',
+            'error_type': type(e).__name__,
+            'debug_info': f'Error occurred in /split endpoint: {str(e)}'
+        }), 500
 
 @app.route('/download/<path:filename>', methods=['GET'])
 def download_file(filename):
