@@ -484,16 +484,20 @@ def split_file():
         # Create ZIP file immediately after splitting with enhanced verification
         zip_filename = f"{session_id}_all_segments.zip"
         zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
-        zip_download_url = None
+        zip_created_successfully = False
         
         try:
             import zipfile
+            logger.info(f"Creating ZIP file: {zip_path}")
+            
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for filename in output_files:
                     file_path = os.path.join(output_dir, filename)
                     if os.path.exists(file_path):
                         zipf.write(file_path, filename)
                         logger.info(f"Added to ZIP: {filename}")
+                    else:
+                        logger.warning(f"File not found when creating ZIP: {file_path}")
             
             # Verify ZIP file was created successfully
             if os.path.exists(zip_path):
@@ -502,14 +506,18 @@ def split_file():
                 
                 if file_size > 0:
                     # Test read the first few bytes to verify it's a valid ZIP
-                    with open(zip_path, 'rb') as test_file:
-                        header = test_file.read(4)
-                        if len(header) >= 4 and header[:4] == b'PK\x03\x04':  # ZIP file signature
-                            # ZIP file is valid
-                            logger.info(f"ZIP file is valid and ready for download")
-                            session['zip_filename'] = zip_filename
-                        else:
-                            logger.error(f"Created file is not a valid ZIP: {zip_path}")
+                    try:
+                        with open(zip_path, 'rb') as test_file:
+                            header = test_file.read(4)
+                            if len(header) >= 4 and header[:4] == b'PK\x03\x04':  # ZIP file signature
+                                # ZIP file is valid
+                                logger.info(f"ZIP file is valid and ready for download")
+                                session['zip_filename'] = zip_filename
+                                zip_created_successfully = True
+                            else:
+                                logger.error(f"Created file is not a valid ZIP: {zip_path}")
+                    except Exception as read_error:
+                        logger.error(f"Error reading ZIP file for verification: {read_error}")
                 else:
                     logger.error(f"Created ZIP file is empty: {zip_path}")
             else:
@@ -520,21 +528,30 @@ def split_file():
             import traceback
             logger.error(f"ZIP creation traceback: {traceback.format_exc()}")
             # Continue without ZIP file - individual downloads will still work
+            zip_filename = None  # Set to None if ZIP creation failed
         
         total_size_mb = total_size / (1024 * 1024)
         
         logger.info(f"Successfully created {len(output_files)} segments, total size: {total_size_mb:.1f}MB, processing time: {processing_duration:.2f}s")
         
         # Return success response with detailed information
-        return jsonify({
+        response_data = {
             'success': True,
             'message': f'Successfully split into {len(output_files)} segments',
             'files': output_files,
             'total_size_mb': round(total_size_mb, 2),
             'segment_count': len(output_files),
-            'processing_time': round(processing_duration, 2),
-            'zip_filename': zip_filename
-        })
+            'processing_time': round(processing_duration, 2)
+        }
+        
+        # Only include zip_filename if ZIP was created successfully
+        if zip_created_successfully and zip_filename:
+            response_data['zip_filename'] = zip_filename
+            logger.info(f"Including ZIP filename in response: {zip_filename}")
+        else:
+            logger.info("ZIP creation failed or incomplete, not including zip_filename in response")
+        
+        return jsonify(response_data)
     
     except Exception as e:
         # Update upload record with error
