@@ -622,30 +622,114 @@ def download_file(filename):
 
 @app.route('/download-all-zip', methods=['GET'])
 def download_all_zip():
-    """Simple ZIP download endpoint"""
+    """Robust ZIP download endpoint with enhanced error handling"""
+    logger.info("--- ZIP Download Process Started ---")
+    
+    # Get session ID from current session
+    session_id = session.get('session_id')
+    logger.info(f"Session ID: {session_id}")
+    
+    # 1. ガード節: セッションIDの確認
+    if not session_id:
+        logger.error("[ERROR] No session ID found in session")
+        return "Session not found", 400
+    
+    # Define paths
+    session_output_dir = os.path.join(OUTPUT_FOLDER, session_id)
+    zip_filename = f"{session_id}_all_segments.zip"
+    zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
+    
+    logger.info(f"Session output directory: {session_output_dir}")
+    logger.info(f"ZIP file path: {zip_path}")
+    
+    # 2. ガード節: セッション出力ディレクトリの確認
+    if not os.path.isdir(session_output_dir):
+        logger.error(f"[ERROR] Session output directory not found: {session_output_dir}")
+        return "Session files not found. Session may have expired or processing failed.", 404
+    
+    # 3. ガード節: 分割ファイルの存在確認
     try:
-        # Get session ID from current session
-        session_id = session.get('session_id')
-        if not session_id:
-            logger.error("No session ID found")
-            return "Session not found", 400
+        split_files = [f for f in os.listdir(session_output_dir) if f.endswith(('.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'))]
+        logger.info(f"Found {len(split_files)} audio files in session directory")
         
-        # Look for ZIP file in splits directory
-        zip_filename = f"{session_id}_all_segments.zip"
-        zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
-        
-        logger.info(f"Looking for ZIP file: {zip_path}")
-        
+        if not split_files:
+            logger.error("[ERROR] No audio files found in session directory")
+            return "No audio files found. Processing may have failed.", 404
+            
+        for filename in split_files[:5]:  # Log first 5 files
+            logger.info(f"  - {filename}")
+        if len(split_files) > 5:
+            logger.info(f"  ... and {len(split_files) - 5} more files")
+            
+    except Exception as list_error:
+        logger.error(f"[ERROR] Failed to list files in session directory: {str(list_error)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return "Error accessing session files", 500
+    
+    # 4. ZIPファイルの存在確認と作成
+    try:
         if not os.path.exists(zip_path):
-            logger.error(f"ZIP file not found: {zip_path}")
-            return "ZIP file not found", 404
+            logger.info("ZIP file not found, creating new ZIP file...")
+            
+            # Create ZIP file
+            import zipfile
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for filename in split_files:
+                    file_path = os.path.join(session_output_dir, filename)
+                    if os.path.exists(file_path):
+                        zf.write(file_path, filename)
+                        logger.info(f"  - Added {filename} to ZIP")
+                    else:
+                        logger.warning(f"  - File not found when creating ZIP: {filename}")
+            
+            logger.info("ZIP file created successfully")
+        else:
+            logger.info("ZIP file already exists")
         
+        # 5. ZIPファイルの検証
+        if not os.path.exists(zip_path):
+            logger.error("[ERROR] ZIP file was not created")
+            return "Failed to create ZIP file", 500
+        
+        zip_size = os.path.getsize(zip_path)
+        logger.info(f"ZIP file size: {zip_size} bytes")
+        
+        if zip_size == 0:
+            logger.error("[ERROR] ZIP file is empty")
+            return "ZIP file is empty", 500
+        
+        # 6. ZIP署名の検証
+        try:
+            with open(zip_path, 'rb') as test_file:
+                header = test_file.read(4)
+                if len(header) >= 4 and header[:4] == b'PK\x03\x04':
+                    logger.info("ZIP file signature is valid")
+                else:
+                    logger.error(f"[ERROR] Invalid ZIP file signature: {header}")
+                    return "Invalid ZIP file", 500
+        except Exception as read_error:
+            logger.error(f"[ERROR] Failed to read ZIP file for verification: {str(read_error)}")
+            return "Error verifying ZIP file", 500
+        
+        # 7. ファイル送信
         logger.info(f"Sending ZIP file: {zip_path}")
         return send_file(zip_path, as_attachment=True, download_name=zip_filename)
         
+    except FileNotFoundError as e:
+        logger.error(f"[ERROR] FileNotFoundError during ZIP processing: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return "Required files not found", 404
+        
     except Exception as e:
-        logger.error(f"Error downloading ZIP: {str(e)}")
-        return f"Error: {str(e)}", 500
+        logger.error(f"[ERROR] Unexpected error during ZIP processing: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return f"Error processing ZIP file: {str(e)}", 500
+    
+    finally:
+        logger.info("--- ZIP Download Process Completed ---")
 
 @app.route('/cleanup', methods=['POST'])
 def cleanup():
