@@ -60,11 +60,37 @@ db.init_app(app)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# Create database tables
+# Create database tables and run migrations
 with app.app_context():
     # Import models after app is created
     import models
     db.create_all()
+    
+    # Auto-migrate session_id column if needed
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as connection:
+            # Check current column definition
+            result = connection.execute(text("""
+                SELECT column_name, data_type, character_maximum_length 
+                FROM information_schema.columns 
+                WHERE table_name = 'file_uploads' AND column_name = 'session_id'
+            """))
+            
+            current_def = result.fetchone()
+            if current_def and current_def.character_maximum_length == 36:
+                logger.info("Auto-migrating session_id column from VARCHAR(36) to VARCHAR(64)")
+                connection.execute(text("ALTER TABLE file_uploads ALTER COLUMN session_id TYPE VARCHAR(64);"))
+                connection.commit()
+                logger.info("✅ Session ID column migration completed successfully")
+            elif current_def and current_def.character_maximum_length == 64:
+                logger.info("✅ Session ID column is already VARCHAR(64)")
+            else:
+                logger.warning(f"Unexpected session_id column definition: {current_def}")
+                
+    except Exception as migration_error:
+        logger.error(f"Auto-migration failed: {str(migration_error)}")
+        # Continue without migration - app should still work
 
 # Helper function to check allowed file extensions
 def allowed_file(filename):
