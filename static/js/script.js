@@ -455,23 +455,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear previous results
         segmentsList.innerHTML = '';
         
-    // Update download-all link to use the new simple endpoint
-    if (data.zip_filename) {
-        const downloadAllBtn = document.getElementById('download-all');
-        if (downloadAllBtn) {
-            // Use the new simple ZIP download endpoint
-            downloadAllBtn.href = '/download-all-zip';
-            downloadAllBtn.removeAttribute('onclick'); // Remove any previous click handlers
-            console.log('Set ZIP download URL to simple endpoint');
-        }
-    } else {
-        // If no ZIP filename is provided, hide the download all button
-        const downloadAllBtn = document.getElementById('download-all');
-        if (downloadAllBtn) {
-            downloadAllBtn.style.display = 'none';
-            console.log('ZIP file not available, hiding download all button');
-        }
-    }
+        // ZIP download functionality removed - only individual file downloads available
         
         // Add summary information
         const summaryDiv = document.createElement('div');

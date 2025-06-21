@@ -476,82 +476,21 @@ def split_file():
         # Store output files in session
         session['output_files'] = output_files
         
-        # Get session ID
-        session_id = session.get('session_id')
-        if not session_id:
-            return jsonify({'error': 'Session ID not found'}), 400
-        
-        # Create ZIP file immediately after splitting with enhanced verification
-        zip_filename = f"{session_id}_all_segments.zip"
-        zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
-        zip_created_successfully = False
-        
-        try:
-            import zipfile
-            logger.info(f"Creating ZIP file: {zip_path}")
-            
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for filename in output_files:
-                    file_path = os.path.join(output_dir, filename)
-                    if os.path.exists(file_path):
-                        zipf.write(file_path, filename)
-                        logger.info(f"Added to ZIP: {filename}")
-                    else:
-                        logger.warning(f"File not found when creating ZIP: {file_path}")
-            
-            # Verify ZIP file was created successfully
-            if os.path.exists(zip_path):
-                file_size = os.path.getsize(zip_path)
-                logger.info(f"Created ZIP file: {zip_path} ({file_size} bytes)")
-                
-                if file_size > 0:
-                    # Test read the first few bytes to verify it's a valid ZIP
-                    try:
-                        with open(zip_path, 'rb') as test_file:
-                            header = test_file.read(4)
-                            if len(header) >= 4 and header[:4] == b'PK\x03\x04':  # ZIP file signature
-                                # ZIP file is valid
-                                logger.info(f"ZIP file is valid and ready for download")
-                                session['zip_filename'] = zip_filename
-                                zip_created_successfully = True
-                            else:
-                                logger.error(f"Created file is not a valid ZIP: {zip_path}")
-                    except Exception as read_error:
-                        logger.error(f"Error reading ZIP file for verification: {read_error}")
-                else:
-                    logger.error(f"Created ZIP file is empty: {zip_path}")
-            else:
-                logger.error(f"ZIP file was not created: {zip_path}")
-                
-        except Exception as zip_error:
-            logger.error(f"Error creating ZIP file: {zip_error}")
-            import traceback
-            logger.error(f"ZIP creation traceback: {traceback.format_exc()}")
-            # Continue without ZIP file - individual downloads will still work
-            zip_filename = None  # Set to None if ZIP creation failed
+        logger.info(f"Successfully created {len(output_files)} segments for individual download")
         
         total_size_mb = total_size / (1024 * 1024)
         
         logger.info(f"Successfully created {len(output_files)} segments, total size: {total_size_mb:.1f}MB, processing time: {processing_duration:.2f}s")
         
         # Return success response with detailed information
-        response_data = {
+        return jsonify({
             'success': True,
             'message': f'Successfully split into {len(output_files)} segments',
             'files': output_files,
             'total_size_mb': round(total_size_mb, 2),
             'segment_count': len(output_files),
             'processing_time': round(processing_duration, 2)
-        }
-        
-        # Only include zip_filename if ZIP was created successfully
-        if zip_created_successfully and zip_filename:
-            response_data['zip_filename'] = zip_filename
-            logger.info(f"Including ZIP filename in response: {zip_filename}")
-        else:
-            logger.info("ZIP creation failed or incomplete, not including zip_filename in response")
-        
-        return jsonify(response_data)
+        })
     
     except Exception as e:
         # 【最重要】エラーの詳細をコンソールに強制出力
@@ -637,116 +576,7 @@ def download_file(filename):
         logger.error(f"Traceback: {traceback.format_exc()}")
         return f"Error downloading file: {str(e)}", 500
 
-@app.route('/download-all-zip', methods=['GET'])
-def download_all_zip():
-    """Robust ZIP download endpoint with enhanced error handling"""
-    logger.info("--- ZIP Download Process Started ---")
-    
-    # Get session ID from current session
-    session_id = session.get('session_id')
-    logger.info(f"Session ID: {session_id}")
-    
-    # 1. ガード節: セッションIDの確認
-    if not session_id:
-        logger.error("[ERROR] No session ID found in session")
-        return "Session not found", 400
-    
-    # Define paths
-    session_output_dir = os.path.join(OUTPUT_FOLDER, session_id)
-    zip_filename = f"{session_id}_all_segments.zip"
-    zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
-    
-    logger.info(f"Session output directory: {session_output_dir}")
-    logger.info(f"ZIP file path: {zip_path}")
-    
-    # 2. ガード節: セッション出力ディレクトリの確認
-    if not os.path.isdir(session_output_dir):
-        logger.error(f"[ERROR] Session output directory not found: {session_output_dir}")
-        return "Session files not found. Session may have expired or processing failed.", 404
-    
-    # 3. ガード節: 分割ファイルの存在確認
-    try:
-        split_files = [f for f in os.listdir(session_output_dir) if f.endswith(('.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'))]
-        logger.info(f"Found {len(split_files)} audio files in session directory")
-        
-        if not split_files:
-            logger.error("[ERROR] No audio files found in session directory")
-            return "No audio files found. Processing may have failed.", 404
-            
-        for filename in split_files[:5]:  # Log first 5 files
-            logger.info(f"  - {filename}")
-        if len(split_files) > 5:
-            logger.info(f"  ... and {len(split_files) - 5} more files")
-            
-    except Exception as list_error:
-        logger.error(f"[ERROR] Failed to list files in session directory: {str(list_error)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return "Error accessing session files", 500
-    
-    # 4. ZIPファイルの存在確認と作成
-    try:
-        if not os.path.exists(zip_path):
-            logger.info("ZIP file not found, creating new ZIP file...")
-            
-            # Create ZIP file
-            import zipfile
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-                for filename in split_files:
-                    file_path = os.path.join(session_output_dir, filename)
-                    if os.path.exists(file_path):
-                        zf.write(file_path, filename)
-                        logger.info(f"  - Added {filename} to ZIP")
-                    else:
-                        logger.warning(f"  - File not found when creating ZIP: {filename}")
-            
-            logger.info("ZIP file created successfully")
-        else:
-            logger.info("ZIP file already exists")
-        
-        # 5. ZIPファイルの検証
-        if not os.path.exists(zip_path):
-            logger.error("[ERROR] ZIP file was not created")
-            return "Failed to create ZIP file", 500
-        
-        zip_size = os.path.getsize(zip_path)
-        logger.info(f"ZIP file size: {zip_size} bytes")
-        
-        if zip_size == 0:
-            logger.error("[ERROR] ZIP file is empty")
-            return "ZIP file is empty", 500
-        
-        # 6. ZIP署名の検証
-        try:
-            with open(zip_path, 'rb') as test_file:
-                header = test_file.read(4)
-                if len(header) >= 4 and header[:4] == b'PK\x03\x04':
-                    logger.info("ZIP file signature is valid")
-                else:
-                    logger.error(f"[ERROR] Invalid ZIP file signature: {header}")
-                    return "Invalid ZIP file", 500
-        except Exception as read_error:
-            logger.error(f"[ERROR] Failed to read ZIP file for verification: {str(read_error)}")
-            return "Error verifying ZIP file", 500
-        
-        # 7. ファイル送信
-        logger.info(f"Sending ZIP file: {zip_path}")
-        return send_file(zip_path, as_attachment=True, download_name=zip_filename)
-        
-    except FileNotFoundError as e:
-        logger.error(f"[ERROR] FileNotFoundError during ZIP processing: {str(e)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return "Required files not found", 404
-        
-    except Exception as e:
-        logger.error(f"[ERROR] Unexpected error during ZIP processing: {str(e)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return f"Error processing ZIP file: {str(e)}", 500
-    
-    finally:
-        logger.info("--- ZIP Download Process Completed ---")
+# ZIP download functionality removed - only individual file downloads available
 
 @app.route('/cleanup', methods=['POST'])
 def cleanup():
