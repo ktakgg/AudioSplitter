@@ -116,6 +116,47 @@ def get_config():
 def admin_dashboard():
     return render_template('admin.html')
 
+@app.route('/migrate-now')
+def migrate_now():
+    """Manual migration endpoint for debugging"""
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as connection:
+            # Check current column definition
+            result = connection.execute(text("""
+                SELECT column_name, data_type, character_maximum_length 
+                FROM information_schema.columns 
+                WHERE table_name = 'file_uploads' AND column_name = 'session_id'
+            """))
+            
+            current_def = result.fetchone()
+            if current_def:
+                current_length = current_def.character_maximum_length
+                
+                if current_length == 64:
+                    return f"✅ Column is already VARCHAR(64). Current length: {current_length}"
+                
+                # Execute migration
+                connection.execute(text("ALTER TABLE file_uploads ALTER COLUMN session_id TYPE VARCHAR(64);"))
+                connection.commit()
+                
+                # Verify migration
+                result = connection.execute(text("""
+                    SELECT character_maximum_length 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'file_uploads' AND column_name = 'session_id'
+                """))
+                
+                new_def = result.fetchone()
+                new_length = new_def.character_maximum_length if new_def else None
+                
+                return f"✅ Migration completed! Old length: {current_length}, New length: {new_length}"
+            else:
+                return "❌ session_id column not found"
+                
+    except Exception as e:
+        return f"❌ Migration failed: {str(e)}"
+
 @app.route('/upload-chunk', methods=['POST'])
 def upload_chunk():
     """Handle chunked file uploads for large files"""
